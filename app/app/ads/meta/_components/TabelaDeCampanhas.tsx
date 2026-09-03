@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import {
   Table,
   TableBody,
@@ -9,7 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useT } from "@/hooks/i18n/useT";
-import { rotuloDoIndicador } from "@/lib/plataformas-de-anuncio/meta/tabela-de-campanhas";
+import {
+  ordenarParaTela,
+  rotuloDoIndicador,
+} from "@/lib/plataformas-de-anuncio/meta/tabela-de-campanhas";
 import type { LinhaDeCampanha } from "@/lib/plataformas-de-anuncio/types";
 
 /**
@@ -100,6 +105,17 @@ interface Props {
 export function TabelaDeCampanhas({ linhas, moeda }: Props) {
   const t = useT();
 
+  /*
+    Ordenação de EXIBIÇÃO, feita aqui e não na API: a rota devolve o que a
+    plataforma mandou, e quem decide como isso se lê é a tela. Trocar a ordem no
+    servidor obrigaria uma ida à rede para reordenar, o que numa tela cuja cota
+    é escassa seria pagar cota por um `sort`.
+
+    Ativas no topo, e dentro do grupo quem gastou mais primeiro — o porquê de
+    cada critério está em `ordenarParaTela`.
+  */
+  const ordenadas = useMemo(() => ordenarParaTela(linhas), [linhas]);
+
   const dinheiro = (valor: number | null, casas = 2) => {
     if (valor === null) return <span className="text-muted-foreground">{TRACO}</span>;
     return (
@@ -176,7 +192,7 @@ export function TabelaDeCampanhas({ linhas, moeda }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {linhas.map((linha) => {
+          {ordenadas.map((linha) => {
             const rotulo = rotuloDoIndicador(linha.resultado.indicador);
             return (
               <TableRow key={linha.campanhaId}>

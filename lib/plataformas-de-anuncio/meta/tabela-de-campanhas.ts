@@ -269,3 +269,87 @@ export function montarTabelaDeCampanhas(
 
   return linhas;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ordenação para a tela
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Mora aqui, e não dentro do componente, pela mesma razão que o resto deste
+// arquivo: é lógica pura que erra em silêncio (uma comparação que devolve NaN
+// não quebra nada, só embaralha a tabela), e daqui um teste a alcança sem
+// montar React. O componente continua sendo quem ORDENA no cliente, na hora de
+// renderizar — a query da API não muda, e nada é reordenado no servidor.
+
+/**
+ * O peso de cada estado na ordenação.
+ *
+ * ⚠️ Ordena por `status` (o campo de cadastro), NÃO por `effective_status`.
+ * Os dois quase sempre coincidem, mas divergem no caso que mais importa: uma
+ * campanha com `status: ACTIVE` pode ter `effective_status: CAMPAIGN_PAUSED` ou
+ * `WITH_ISSUES` e não estar entregando nada. Se um dia a pergunta virar "o que
+ * está REALMENTE veiculando?", troque para `veiculacao` aqui — a coluna
+ * Veiculação já mostra a diferença na tela.
+ */
+export const PESO_DO_STATUS: Record<string, number> = {
+  ACTIVE: 0,
+  PAUSED: 1,
+};
+
+/** Qualquer estado conhecido que não seja ativo nem pausado: DELETED, ARCHIVED… */
+const PESO_DE_OUTRO_ESTADO = 2;
+
+/**
+ * Sem status é o ÚLTIMO, e é um caso distinto de "arquivada".
+ *
+ * `status: null` significa que a campanha veio no insights e não no cadastro —
+ * apagada entre as duas chamadas. A linha fica porque o gasto dela é real, mas
+ * é a que menos ajuda a decidir alguma coisa hoje, então vai para o fim.
+ */
+const PESO_SEM_ESTADO = 3;
+
+export function pesoDoStatus(status: string | null): number {
+  if (!status) return PESO_SEM_ESTADO;
+  return PESO_DO_STATUS[status] ?? PESO_DE_OUTRO_ESTADO;
+}
+
+/**
+ * Ativas no topo; dentro do mesmo estado, quem gastou mais primeiro.
+ *
+ * ─── Por que gasto decrescente como segundo critério ────────────────────────
+ *
+ * A ordem que vinha da plataforma não tem significado para quem lê: é a ordem
+ * de retorno do endpoint. Gasto decrescente responde à pergunta que traz alguém
+ * a esta tela — "para onde está indo meu dinheiro?" — e põe no topo a linha
+ * cujo custo por resultado mais importa acertar.
+ *
+ * ─── Ausência de gasto vai para o fim do próprio grupo ──────────────────────
+ *
+ * `gasto: null` é campanha que não veiculou no período. Tratá-la como 0 a
+ * empataria com quem veiculou e gastou zero de verdade; mandá-la para o fim do
+ * grupo mantém no topo o que tem número para ler.
+ *
+ * ─── Desempate por nome ─────────────────────────────────────────────────────
+ *
+ * `sort` é estável em JS moderno, então sem isto a ordem já seria previsível.
+ * O nome entra porque o grupo "sem veiculação" tem gasto nulo em TODAS as
+ * linhas, e ali a estabilidade só preservaria a ordem do endpoint — que é
+ * arbitrária. Alfabético é pelo menos procurável com o olho.
+ *
+ * NÃO muta a entrada: `linhas` chega como prop de React, e ordenar no lugar
+ * mudaria um objeto que o React considera imutável entre renders.
+ */
+export function ordenarParaTela(linhas: LinhaDeCampanha[]): LinhaDeCampanha[] {
+  return [...linhas].sort((a, b) => {
+    const porEstado = pesoDoStatus(a.status) - pesoDoStatus(b.status);
+    if (porEstado !== 0) return porEstado;
+
+    // `null` depois de qualquer número, sem virar 0 no meio do caminho.
+    if (a.gasto === null && b.gasto !== null) return 1;
+    if (a.gasto !== null && b.gasto === null) return -1;
+    if (a.gasto !== null && b.gasto !== null && a.gasto !== b.gasto) {
+      return b.gasto - a.gasto;
+    }
+
+    return a.nome.localeCompare(b.nome, "pt-BR");
+  });
+}

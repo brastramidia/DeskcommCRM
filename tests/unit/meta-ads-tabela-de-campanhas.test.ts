@@ -7,6 +7,8 @@ import {
   custoPorResultado,
   montarTabelaDeCampanhas,
   numeroOuNulo,
+  ordenarParaTela,
+  pesoDoStatus,
   rotuloDoIndicador,
   somaDeAcoes,
   valorIndicado,
@@ -294,5 +296,113 @@ describe("rótulo do indicador", () => {
 
   it("indicador ausente é nulo, não string vazia", () => {
     expect(rotuloDoIndicador(null)).toBeNull();
+  });
+});
+
+describe("ordenação da tela — ativas no topo", () => {
+  /** Constrói uma linha só com o que a ordenação lê. */
+  function linha(nome: string, status: string | null, gasto: number | null): LinhaDeCampanha {
+    return {
+      campanhaId: nome,
+      nome,
+      status,
+      veiculacao: status,
+      objetivo: null,
+      resultado: { valor: null, custoPorResultado: null, indicador: null },
+      gasto,
+      impressoes: null,
+      alcance: null,
+      cpm: null,
+      ctr: null,
+      frequencia: null,
+      cpc: null,
+      hookRate: null,
+      thruPlays: null,
+    };
+  }
+
+  it("ACTIVE vem antes de PAUSED, e o resto depois dos dois", () => {
+    const ordenadas = ordenarParaTela([
+      linha("arquivada", "ARCHIVED", 100),
+      linha("pausada", "PAUSED", 100),
+      linha("ativa", "ACTIVE", 1),
+      linha("removida", "DELETED", 100),
+    ]);
+    expect(ordenadas.map((l) => l.nome)).toEqual(["ativa", "pausada", "arquivada", "removida"]);
+  });
+
+  it("a ativa sobe mesmo tendo gasto muito menor que as pausadas", () => {
+    // O caso que motivou a mudança: sem a ordenação por estado, a campanha que
+    // está no ar hoje ficava embaixo de várias pausadas que gastaram mais.
+    const ordenadas = ordenarParaTela([
+      linha("pausada cara", "PAUSED", 364.63),
+      linha("ativa barata", "ACTIVE", 0.01),
+    ]);
+    expect(ordenadas[0]?.nome).toBe("ativa barata");
+  });
+
+  it("sem status vai para o fim — depois até de arquivada", () => {
+    const ordenadas = ordenarParaTela([
+      linha("orfa", null, 500),
+      linha("arquivada", "ARCHIVED", 1),
+      linha("ativa", "ACTIVE", 1),
+    ]);
+    expect(ordenadas.map((l) => l.nome)).toEqual(["ativa", "arquivada", "orfa"]);
+  });
+
+  it("dentro do mesmo estado, quem gastou mais vem primeiro", () => {
+    const ordenadas = ordenarParaTela([
+      linha("c", "PAUSED", 10),
+      linha("a", "PAUSED", 364.63),
+      linha("b", "PAUSED", 72.16),
+    ]);
+    expect(ordenadas.map((l) => l.nome)).toEqual(["a", "b", "c"]);
+  });
+
+  it("gasto ausente cai para o fim do próprio grupo, sem virar zero", () => {
+    // `null` não pode empatar com o zero MEDIDO: quem gastou zero de verdade
+    // veiculou, quem tem `null` nem apareceu no período.
+    const ordenadas = ordenarParaTela([
+      linha("sem dado", "PAUSED", null),
+      linha("gastou zero", "PAUSED", 0),
+      linha("gastou", "PAUSED", 5),
+    ]);
+    expect(ordenadas.map((l) => l.nome)).toEqual(["gastou", "gastou zero", "sem dado"]);
+  });
+
+  it("empate de estado e gasto desempata por nome, e não pela ordem do endpoint", () => {
+    const ordenadas = ordenarParaTela([
+      linha("Zebra", "PAUSED", null),
+      linha("Abelha", "PAUSED", null),
+    ]);
+    expect(ordenadas.map((l) => l.nome)).toEqual(["Abelha", "Zebra"]);
+  });
+
+  it("NÃO muta o array recebido — ele chega como prop de React", () => {
+    const entrada = [linha("pausada", "PAUSED", 1), linha("ativa", "ACTIVE", 1)];
+    const copia = [...entrada];
+    ordenarParaTela(entrada);
+    expect(entrada).toEqual(copia);
+    expect(entrada[0]?.nome).toBe("pausada");
+  });
+
+  it("pesoDoStatus: ativa < pausada < outros < ausente", () => {
+    expect(pesoDoStatus("ACTIVE")).toBeLessThan(pesoDoStatus("PAUSED"));
+    expect(pesoDoStatus("PAUSED")).toBeLessThan(pesoDoStatus("ARCHIVED"));
+    expect(pesoDoStatus("ARCHIVED")).toBeLessThan(pesoDoStatus(null));
+  });
+
+  it("as 7 campanhas reais da conta saem com a única ativa no topo", () => {
+    const tabela = montarTabelaDeCampanhas(CAMPANHAS, [
+      CADASTRO_AGENDA_CHEIA,
+      SEM_VEICULACAO,
+      SEM_RESULTS,
+    ]);
+    const ordenadas = ordenarParaTela(tabela);
+    // `120254899459370350` é a única ACTIVE do cadastro sondado.
+    expect(ordenadas[0]?.campanhaId).toBe("120254899459370350");
+    expect(ordenadas[0]?.status).toBe("ACTIVE");
+    // Logo abaixo, a pausada que mais gastou (R$ 364,63).
+    expect(ordenadas[1]?.nome).toBe("Cadastro: Agenda Cheia");
   });
 });
