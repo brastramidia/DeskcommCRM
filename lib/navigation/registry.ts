@@ -469,6 +469,11 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     //
     // ⚠️ O grupo "canais" não tem hub, então o ⌘K passa a ser a ÚNICA porta
     // navegável. Para voltar a mostrá-la, basta devolver `sidebar: true`.
+    //
+    // ⚠️ E agora existe uma SEGUNDA razão, independente da primeira: com o grupo
+    // "Atividades", o menu não cabe mais em 1280x900 com esta linha de volta. O
+    // e2e `navegacao.spec.ts` reprova, e a mensagem dele diz por quantos pixels.
+    // Devolver `sidebar: true` aqui exige tirar outra linha de algum lugar.
   },
   {
     href: "/app/webhooks",

@@ -31,5 +31,12 @@ As tarefas não têm vínculo com contatos, leads ou conversas: são coisas suas
 ("renovar o certificado", "ligar para o contador"), não etapas de um atendimento.
 Para cobrança ligada a um cliente, o lugar continua sendo o follow-up e a agenda.
 
-Para quem opera uma instalação, nada muda no dia a dia: nenhuma configuração
+**Um item mudou de lugar no menu.** O menu lateral tem altura finita — ele
+precisa caber sem rolagem num notebook comum —, e a seção nova ocupou o espaço
+que faltava. O atalho do **Nuvemshop** saiu da barra lateral: quem conecta a loja
+faz isso uma vez, e depois não volta ali. A tela continua existindo e continua
+alcançável pela busca (⌘K, digitando "Nuvemshop"); o que se perdeu foi um clique
+de atalho, não o caminho.
+
+Para quem opera uma instalação, nada mais muda no dia a dia: nenhuma configuração
 nova, nenhum passo de atualização. A área aparece sozinha depois de atualizar.
