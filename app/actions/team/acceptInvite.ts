@@ -13,6 +13,7 @@
 import { redirect } from "next/navigation";
 
 import { audit } from "@/lib/audit";
+import { ESCOPO_PADRAO } from "@/lib/auth/types";
 import { verifyInviteToken } from "@/lib/auth/invite-token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -60,6 +61,8 @@ export async function acceptInviteAction(token: string): Promise<AcceptInviteRes
       .from("user_organizations")
       .update({
         role: payload.role,
+        // Do TOKEN, nunca do corpo — a mesma regra da organização e do papel.
+        escopo: payload.escopo ?? ESCOPO_PADRAO,
         revoked_at: null,
         accepted_at: existing.revoked_at ? nowIso : (nowIso),
         updated_at: nowIso,
@@ -82,6 +85,7 @@ export async function acceptInviteAction(token: string): Promise<AcceptInviteRes
         user_id: user.id,
         organization_id: payload.organization_id,
         role: payload.role,
+        escopo: payload.escopo ?? ESCOPO_PADRAO,
         invited_at: new Date(payload.exp * 1000 - 24 * 60 * 60 * 1000).toISOString(),
         accepted_at: nowIso,
       })

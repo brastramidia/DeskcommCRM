@@ -20,6 +20,26 @@ import type { Idioma } from "@/lib/i18n/idiomas";
  * usuário. A RLS segue intacta.
  */
 export type Role = "viewer" | "agent" | "ai_operator" | "manager" | "admin";
+
+/**
+ * A PORTA que a pessoa usa nesta organização — ortogonal ao papel.
+ *
+ * ⚠️ NÃO É UM DEGRAU DA ESCADA. `ROLE_RANK` modela hierarquia: quem está acima
+ * vê tudo de quem está abaixo. Medido no registro de navegação, QUINZE telas não
+ * exigem papel nenhum, então o degrau mais baixo já enxerga Inbox, Contatos,
+ * Funis e a lista de tarefas pessoais do dono.
+ *
+ * O colaborador de projetos precisa do oposto: um conjunto DIFERENTE, não um
+ * subconjunto menor. Por isso escopo e papel convivem — dentro de Projetos ele
+ * continua tendo um papel, e é ele que decide o que pode fazer lá.
+ *
+ * O mesmo desenho de `is_platform_admin`, que o produto já descreve como "role
+ * transversal".
+ */
+export type Escopo = "completo" | "projetos";
+
+/** O default de todo vínculo — inclusive os que existiam antes da coluna. */
+export const ESCOPO_PADRAO: Escopo = "completo";
 export const ROLE_RANK: Record<Role, number> = {
   viewer: 1,
   agent: 2,
@@ -66,6 +86,8 @@ export interface UserOrgMembership {
   organization_id: string;
   organization_name: string;
   role: Role;
+  /** Ver `Escopo`. Ausente = `completo`, que é o default da coluna. */
+  escopo?: Escopo;
   /**
    * Idioma padrão da organização (`organizations.locale`).
    *
@@ -137,6 +159,15 @@ export interface ActiveOrg {
   orgId: string;
   name: string;
   role: Role;
+  /**
+   * A porta desta pessoa nesta organização. Ver `Escopo`.
+   *
+   * ⚠️ Diferente do `visibility_mode` logo abaixo, este campo É fonte de
+   * autorização na navegação e nas rotas — mas nunca a ÚNICA: a RLS da área de
+   * Projetos repete a regra no banco, porque esconder um menu não protege uma
+   * rota chamada à mão.
+   */
+  escopo?: Escopo;
   /**
    * Escopo de visualização da org (G4-01). Opcional: só é preenchido no client
    * context (AppLayout) para a UI do inbox decidir visões visíveis. Não é fonte

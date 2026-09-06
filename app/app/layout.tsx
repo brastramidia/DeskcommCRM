@@ -1,4 +1,8 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+
+import { CASA_DO_ESCOPO, podeAbrirPagina } from "@/lib/auth/escopo-de-rota";
+import { ESCOPO_PADRAO } from "@/lib/auth/types";
 import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
 import { DEFAULT_VISIBILITY_MODE, type VisibilityMode } from "@/lib/auth/types";
@@ -28,6 +32,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   let activeOrg = await resolveActiveOrg(user);
+
+  /*
+    A GUARDA DO ESCOPO — antes de qualquer página renderizar.
+
+    O colaborador de projetos é gente de fora da operação. Esconder os itens do
+    menu não o impede de digitar `/app/inbox` na barra de endereço e ler as
+    conversas de WhatsApp dos clientes; só uma guarda de servidor impede.
+
+    O pathname chega por header, posto pelo `proxy.ts` — é o caminho que este
+    repo já usa para dar o caminho da requisição a um Server Component.
+
+    ⚠️ Esta guarda cobre PÁGINAS. As rotas de API têm a sua, em `requireRole`, e
+    a RLS do banco é a terceira. Nenhuma sozinha é a proteção: esta cai se o
+    header sumir, a de API não conhece páginas, e a do banco não sabe desenhar
+    tela. Elas se cobrem.
+  */
+  if (activeOrg) {
+    const caminho = (await headers()).get("x-pathname");
+    const escopo = activeOrg.escopo ?? ESCOPO_PADRAO;
+    // Sem header não se adivinha: manda para casa em vez de liberar. Cair na
+    // própria área é inofensivo para quem tem acesso completo, e é a decisão
+    // segura para quem não tem.
+    if (!caminho || !podeAbrirPagina(caminho, escopo)) {
+      const casa = CASA_DO_ESCOPO[escopo];
+      if (caminho !== casa) redirect(casa);
+    }
+  }
 
   /**
    * A cor desta organização, serializada, ou `null` quando ela não tem uma.

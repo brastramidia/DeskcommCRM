@@ -45,6 +45,13 @@ const COPY: Record<string, { variant: Variant; msg?: string }> = {
     variant: "warning",
     msg: "Você não tem permissão para esta ação.",
   },
+  forbidden_escopo: {
+    variant: "warning",
+    // Frase diferente de `forbidden_role` de propósito: "não tem permissão"
+    // convida a pedir um papel maior, e papel maior não abre esta porta. O que
+    // falta é acesso à ÁREA, e quem resolve é quem administra a organização.
+    msg: "Esta área não faz parte do seu acesso.",
+  },
   resource_not_found: {
     variant: "error",
     msg: "Recurso não encontrado ou já removido.",

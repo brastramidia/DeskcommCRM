@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+
+import type { Escopo } from "@/lib/auth/types";
 import { toast } from "sonner";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -25,6 +27,7 @@ export function InviteForm() {
   const t = useT();
   const [emailsRaw, setEmailsRaw] = useState("");
   const [role, setRole] = useState<Role>("agent");
+  const [escopo, setEscopo] = useState<Escopo>("completo");
   const [result, setResult] = useState<ResultState | null>(null);
   const invite = useInviteMembers();
 
@@ -45,7 +48,7 @@ export function InviteForm() {
     }
     try {
       const res = await invite.mutateAsync({
-        invitations: unique.map((email) => ({ email, role })),
+        invitations: unique.map((email) => ({ email, role, escopo })),
       });
       setResult(res.data);
       const ok = res.data.sent.length;
@@ -86,6 +89,29 @@ export function InviteForm() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="escopo">{t("Acesso")}</Label>
+          <Select value={escopo} onValueChange={(v) => setEscopo(v as Escopo)}>
+            <SelectTrigger id="escopo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="completo">{t("O sistema inteiro")}</SelectItem>
+              <SelectItem value="projetos">{t("Só a área de Projetos")}</SelectItem>
+            </SelectContent>
+          </Select>
+          {/*
+            A frase muda com a escolha porque as duas opções têm consequências
+            opostas, e "acesso" sozinho não diz qual é qual. Quem convida um
+            colaborador de fora precisa ler, ANTES de enviar, que aquela pessoa
+            não verá as conversas nem os contatos.
+          */}
+          <p className="text-xs text-muted-foreground">
+            {escopo === "projetos"
+              ? t("A pessoa verá apenas Projetos — nada de Inbox, Contatos, Funis ou Tarefas.")
+              : t("A pessoa verá o CRM inteiro, limitado pelo papel escolhido acima.")}
+          </p>
         </div>
         <Button type="submit" disabled={invite.isPending}>
           {invite.isPending ? t("Enviando…") : t("Enviar convites")}

@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { empresaExigeMfa, exigeCadastroDeMfa } from "@/lib/auth/politica-mfa";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
+import { ESCOPO_PADRAO, type Escopo } from "./types";
 import type { AuthUser, Role, UserOrgMembership, ActiveOrg } from "./types";
 
 const ACTIVE_ORG_COOKIE = "active_org";
@@ -22,6 +23,7 @@ const ACTIVE_ORG_COOKIE = "active_org";
 interface RawMembershipRow {
   organization_id: string;
   role: string;
+  escopo?: string | null;
   /** Só para ORDENAR — a lista decide qual organização fica ativa sem cookie. */
   accepted_at?: string | null;
   organizations: OrgJoin | OrgJoin[] | null;
@@ -197,7 +199,7 @@ async function carregarAuthUser(): Promise<AuthUser | null> {
       .maybeSingle(),
     supabase
       .from("user_organizations")
-      .select("organization_id, role, accepted_at, organizations(display_name, locale)")
+      .select("organization_id, role, escopo, accepted_at, organizations(display_name, locale)")
       .eq("user_id", user.id)
       .is("revoked_at", null)
       .order("accepted_at", { ascending: true, nullsFirst: true })
@@ -260,6 +262,10 @@ async function carregarAuthUser(): Promise<AuthUser | null> {
       organization_id: row.organization_id,
       organization_name: org?.display_name ?? "—",
       role: row.role as Role,
+      // `?? ESCOPO_PADRAO` e não `as Escopo`: um vínculo gravado antes da
+      // migration 0207 volta sem a coluna, e tratá-lo como escopo desconhecido
+      // trancaria fora do sistema quem já usava. Ausência é `completo`.
+      escopo: (row.escopo as Escopo | null) ?? ESCOPO_PADRAO,
       locale: org?.locale ?? null,
     };
   });
@@ -299,7 +305,12 @@ export async function resolveActiveOrg(authUser: AuthUser): Promise<ActiveOrg | 
   const store = await cookies();
   const ativo = escolherMembroAtivo(authUser.organizations, store.get(ACTIVE_ORG_COOKIE)?.value);
   if (!ativo) return null;
-  return { orgId: ativo.organization_id, name: ativo.organization_name, role: ativo.role };
+  return {
+    orgId: ativo.organization_id,
+    name: ativo.organization_name,
+    role: ativo.role,
+    escopo: ativo.escopo ?? ESCOPO_PADRAO,
+  };
 }
 
 /**

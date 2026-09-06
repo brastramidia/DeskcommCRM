@@ -8,6 +8,14 @@
 import { z } from "zod";
 
 export const ROLES = ["viewer", "agent", "manager", "admin"] as const;
+
+/**
+ * Os escopos de acesso — mantidos em sincronia com o CHECK da migration 0207.
+ *
+ * ⚠️ `projetos` NÃO é um papel: é a porta. Quem entra por ela continua tendo um
+ * papel, e é ele que decide o que a pessoa pode fazer DENTRO de Projetos.
+ */
+export const ESCOPOS = ["completo", "projetos"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const inviteMemberSchema = z.object({
@@ -16,6 +24,11 @@ export const inviteMemberSchema = z.object({
       z.object({
         email: z.string().email(),
         role: z.enum(ROLES),
+        /**
+         * A porta desta pessoa. Ausente = `completo`, que é o comportamento de
+         * todo convite emitido até aqui — nenhum cliente antigo muda de efeito.
+         */
+        escopo: z.enum(ESCOPOS).optional(),
       }),
     )
     .min(1)

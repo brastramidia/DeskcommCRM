@@ -6477,6 +6477,28 @@ export const DICIONARIO: Traducoes = {
   "Falta permissão de calendário": { es: "Falta permiso de calendario" },
   "O Google pediu para esperar": { es: "Google pidió esperar" },
   // "Com erro" já está traduzida acima.
+  // ─── Escopo de acesso e área de Projetos (fase 1) ───
+  "Projetos": { es: "Proyectos" },
+  "Acesso": { es: "Acceso" },
+  "O sistema inteiro": { es: "El sistema completo" },
+  "Só a área de Projetos": { es: "Solo el área de Proyectos" },
+  "A pessoa verá apenas Projetos — nada de Inbox, Contatos, Funis ou Tarefas.": {
+    es: "La persona verá solo Proyectos — nada de Inbox, Contactos, Embudos ni Tareas.",
+  },
+  "A pessoa verá o CRM inteiro, limitado pelo papel escolhido acima.": {
+    es: "La persona verá el CRM completo, limitado por el rol elegido arriba.",
+  },
+  "Aqui vão aparecer os projetos em que você foi incluído.": {
+    es: "Aquí van a aparecer los proyectos en los que fuiste incluido.",
+  },
+  "Os projetos de cliente, em quadro — status, responsáveis e checklist.": {
+    es: "Los proyectos de cliente, en tablero — estado, responsables y checklist.",
+  },
+  "Área em construção": { es: "Área en construcción" },
+  "O acesso já está valendo — o quadro de projetos, o checklist e o histórico chegam em seguida.": {
+    es: "El acceso ya está activo — el tablero de proyectos, el checklist y el historial llegan enseguida.",
+  },
+  "Esta área não faz parte do seu acesso.": { es: "Esta área no forma parte de tu acceso." },
 };
 
 /**

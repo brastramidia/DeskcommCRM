@@ -103,6 +103,10 @@ export async function POST(req: NextRequest): Promise<Response> {
       email,
       organization_id: activeOrg.orgId,
       role: inv.role,
+      // Vai ASSINADO: o escopo decide a quais telas a pessoa terá acesso, e
+      // aceitá-lo depois pelo corpo do aceite deixaria qualquer convidado se
+      // promover a acesso completo.
+      escopo: inv.escopo ?? "completo",
       exp,
     });
     const acceptUrl = `${baseUrl.replace(/\/$/, "")}/team/accept-invite/${token}`;

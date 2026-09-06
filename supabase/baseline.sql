@@ -17004,6 +17004,51 @@ revoke execute on function public.fn_conversation_assign(uuid, uuid, uuid, text,
 grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean)
   to authenticated, service_role;
 
+-- ---- escopo de acesso do colaborador (migration 0207) ----
+--
+-- O COLABORADOR não é um papel menor, é uma porta diferente. `fn_role_at_least`
+-- modela escada, e 15 telas do produto não exigem papel nenhum — o degrau mais
+-- baixo já vê Inbox, Contatos, Funis e as tarefas pessoais do dono. Um papel
+-- inferior veria justamente o que ele não pode ver.
+--
+-- `completo` é o default: a coluna é aditiva e nenhum vínculo existente muda de
+-- acesso. Quem tem `projetos` só alcança o que for explicitamente liberado —
+-- falha FECHADA, para tela nova nascer invisível a ele.
+alter table public.user_organizations
+  add column if not exists escopo text not null default 'completo';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'user_organizations_escopo_check'
+  ) then
+    alter table public.user_organizations
+      add constraint user_organizations_escopo_check
+      check (escopo in ('completo', 'projetos'));
+  end if;
+end $$;
+
+create index if not exists user_organizations_escopo_idx
+  on public.user_organizations (organization_id, user_id, escopo);
+
+create or replace function public.fn_user_escopo(p_org uuid)
+returns text
+language sql
+stable
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+  select escopo
+    from public.user_organizations
+   where organization_id = p_org
+     and user_id = auth.uid()
+     and revoked_at is null
+   limit 1;
+$$;
+
+revoke all on function public.fn_user_escopo(uuid) from public, anon;
+grant execute on function public.fn_user_escopo(uuid) to authenticated, service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ ESTE BLOCO É, DE PROPÓSITO, O ÚLTIMO DO ARQUIVO. Apêndice novo entra ANTES

@@ -108,7 +108,9 @@ describe("loadAuthUser — falha de permissão não vira 'sem organização'", (
 
   it("usuário com organização resolve normalmente", async () => {
     consultas.memberships = {
-      data: [{ organization_id: "o1", role: "admin", organizations: { display_name: "Acme" } }],
+      data: [{ organization_id: "o1", role: "admin",
+        // A migration 0207 acrescentou a porta ao vínculo; ausente = `completo`.
+        escopo: "completo", organizations: { display_name: "Acme" } }],
       error: null,
     };
     const u = await loadAuthUser();
@@ -116,7 +118,9 @@ describe("loadAuthUser — falha de permissão não vira 'sem organização'", (
       // `locale` é o idioma padrão da organização, que entra na membership para
       // a resolução do idioma da sessão não precisar de uma segunda consulta.
       // Aqui vem `null` porque o dublê não devolve a coluna.
-      { organization_id: "o1", organization_name: "Acme", role: "admin", locale: null },
+      // `escopo` entrou com a migration 0207: a PORTA que a pessoa usa nesta
+      // organização, ortogonal ao papel. Ausente na linha = `completo`.
+      { organization_id: "o1", organization_name: "Acme", role: "admin", escopo: "completo", locale: null },
     ]);
   });
 });

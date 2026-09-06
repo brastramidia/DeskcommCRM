@@ -1,6 +1,6 @@
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
-import { ROLE_RANK, type Role } from "@/lib/auth/types";
+import { ROLE_RANK, type Escopo, type Role } from "@/lib/auth/types";
 import {
   Bell,
   BookOpen,
@@ -88,6 +88,18 @@ export interface NavDestination {
   section?: string;
   /** Ausente = viewer. Ver a regra de escolha abaixo. */
   minRole?: Role;
+  /**
+   * Quais ESCOPOS alcançam este destino. Ausente = só `completo`.
+   *
+   * ⚠️ O DEFAULT É O QUE PROTEGE, e ele é fechado de propósito. O colaborador de
+   * projetos é gente de fora da operação; se destino novo nascesse visível a ele
+   * e coubesse a quem escreve lembrar de fechar, o vazamento chegaria no dia do
+   * primeiro esquecimento — e o que vaza é conversa de WhatsApp de cliente.
+   *
+   * Abrir uma tela ao colaborador passa a ser um ato deliberado, que aparece no
+   * diff e é lido por quem revisa.
+   */
+  escopos?: readonly Escopo[];
   /** Ausente = só no hub. `true` = uso diário, sobe para o sidebar. */
   sidebar?: boolean;
   healthDot?: boolean;
@@ -430,6 +442,19 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     overdueBadge: true,
   },
 
+  {
+    // A ÚNICA tela que o escopo `projetos` alcança — e por isso a única do
+    // registro com `escopos` declarado. Todas as outras ficam com o default
+    // fechado, que é o que impede o colaborador de ver o CRM.
+    href: "/app/projetos",
+    label: "Projetos",
+    description: "Os projetos de cliente, em quadro — status, responsáveis e checklist.",
+    icon: Kanban,
+    group: "atividades",
+    sidebar: true,
+    escopos: ["completo", "projetos"],
+  },
+
   // ---- Canais — por onde as mensagens entram e saem ----
   {
     href: "/app/connections",
@@ -671,7 +696,25 @@ export const NAV_DESTINATIONS: NavDestination[] = [
  * — hooks não rodam em laço condicional, então cada permissão exigia sua linha.
  * Como função pura, um `.filter()` resolve todas.
  */
-export function canSee(d: NavDestination, isPlatformAdmin: boolean, role: Role | null): boolean {
+export function canSee(
+  d: NavDestination,
+  isPlatformAdmin: boolean,
+  role: Role | null,
+  escopo: Escopo = "completo",
+): boolean {
+  /*
+    O ESCOPO É A PRIMEIRA PORTA, e ele vem ANTES do bypass de platform admin.
+
+    Papel é escada: quem está acima vê tudo de quem está abaixo. Escopo não é —
+    ele diz QUAL CONJUNTO de telas existe para esta pessoa. Perguntar o papel
+    primeiro devolveria "sim" para um colaborador em qualquer tela sem `minRole`,
+    que são quinze, incluindo Inbox e Contatos.
+
+    E o platform admin também passa por aqui: se alguém tiver escopo de projetos,
+    é por escopo que se decide. Rank é o que se pode FAZER lá dentro, não por
+    qual porta se entra.
+  */
+  if (!(d.escopos ?? ["completo"]).includes(escopo)) return false;
   if (isPlatformAdmin) return true;
   if (!role) return false;
   return ROLE_RANK[role] >= ROLE_RANK[d.minRole ?? "viewer"];
@@ -681,11 +724,12 @@ export function canSee(d: NavDestination, isPlatformAdmin: boolean, role: Role |
 export function sidebarGroups(
   isPlatformAdmin: boolean,
   role: Role | null,
+  escopo: Escopo = "completo",
 ): Array<{ group: NavGroup; items: NavDestination[] }> {
   return NAV_GROUPS.map((group) => ({
     group,
     items: NAV_DESTINATIONS.filter(
-      (d) => d.group === group.id && d.sidebar && canSee(d, isPlatformAdmin, role),
+      (d) => d.group === group.id && d.sidebar && canSee(d, isPlatformAdmin, role, escopo),
     ),
   })).filter((g) => g.items.length > 0);
 }
@@ -701,10 +745,11 @@ export function hubSections(
   group: NavGroupId,
   isPlatformAdmin: boolean,
   role: Role | null,
+  escopo: Escopo = "completo",
 ): Array<{ section: string; items: NavDestination[] }> {
   const porSecao = new Map<string, NavDestination[]>();
   for (const d of NAV_DESTINATIONS) {
-    if (d.group !== group || !canSee(d, isPlatformAdmin, role)) continue;
+    if (d.group !== group || !canSee(d, isPlatformAdmin, role, escopo)) continue;
     const secao = d.section ?? "";
     const atual = porSecao.get(secao);
     if (atual) atual.push(d);
@@ -714,6 +759,10 @@ export function hubSections(
 }
 
 /** Projeção do ⌘K: todo destino visível, do sidebar ou não. */
-export function searchable(isPlatformAdmin: boolean, role: Role | null): NavDestination[] {
-  return NAV_DESTINATIONS.filter((d) => canSee(d, isPlatformAdmin, role));
+export function searchable(
+  isPlatformAdmin: boolean,
+  role: Role | null,
+  escopo: Escopo = "completo",
+): NavDestination[] {
+  return NAV_DESTINATIONS.filter((d) => canSee(d, isPlatformAdmin, role, escopo));
 }

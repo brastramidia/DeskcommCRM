@@ -21,7 +21,7 @@ import type { NextResponse } from "next/server";
 import { fail, type ApiError } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
-import { ROLE_RANK, type ActiveOrg, type AuthUser, type Role } from "@/lib/auth/types";
+import { ESCOPO_PADRAO, ROLE_RANK, type ActiveOrg, type AuthUser, type Escopo, type Role } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 
 export type RoleCheck =
@@ -36,6 +36,18 @@ interface RequireRoleOpts {
   /** Platform admin (role transversal) bypassa o rank do tenant. */
   allowPlatformAdmin?: boolean;
   /**
+   * Escopos que esta rota aceita. Ausente = só `completo`.
+   *
+   * ⚠️ FALHA FECHADA, e é o coração da separação do colaborador. Esconder o item
+   * do menu não protege nada: `/api/v1/contacts` responde a quem a chamar com um
+   * cookie válido, menu ou não. É AQUI que a porta se fecha, no gate único que a
+   * doutrina já obriga toda rota a usar.
+   *
+   * Rota nova nasce fechada ao colaborador. Abri-la é escrever
+   * `escopos: ["completo", "projetos"]` — um ato deliberado, visível no diff.
+   */
+  escopos?: readonly Escopo[];
+  /**
    * Override da org onde o role é resolvido (default: org ativa do cookie).
    * Use quando a autorização é sobre a org do RECURSO (ex.: LGPD anonymize —
    * admin na org do CONTATO), resolvida de fonte confiável (query RLS-scoped),
@@ -49,7 +61,7 @@ interface RequireRoleOpts {
  * `if (!authz.ok) return authz.response;`
  */
 export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promise<RoleCheck> {
-  const { requestId, resource, allowPlatformAdmin = false, organizationId } = opts;
+  const { requestId, resource, allowPlatformAdmin = false, organizationId, escopos } = opts;
 
   const user = await loadAuthUser();
   if (!user) {
@@ -75,6 +87,33 @@ export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promis
     return {
       ok: false,
       response: fail("forbidden_tenant", "Sem organização ativa.", 403, { requestId }),
+    };
+  }
+
+  /*
+    O ESCOPO É A PRIMEIRA PORTA — antes do papel e antes do bypass de platform
+    admin, pelo mesmo motivo que em `canSee`: papel é escada, escopo é conjunto.
+    Perguntar o papel primeiro deixaria um colaborador com papel `viewer` passar
+    em toda rota gateada por `requireRole("viewer")`.
+
+    O 403 nomeia o escopo e não o papel: mandar quem tem escopo de projetos
+    "pedir um papel maior" o faria pedir o que não resolve.
+  */
+  const escopoDaPessoa = org.escopo ?? ESCOPO_PADRAO;
+  if (!(escopos ?? [ESCOPO_PADRAO]).includes(escopoDaPessoa)) {
+    void audit({
+      action: "authz.denied",
+      actorUserId: user.id,
+      organizationId: org.orgId,
+      resourceType: resource ?? null,
+      requestId,
+      metadata: { reason: "escopo_insuficiente", escopo: escopoDaPessoa },
+    });
+    return {
+      ok: false,
+      response: fail("forbidden_escopo", "Esta área não faz parte do seu acesso.", 403, {
+        requestId,
+      }),
     };
   }
 

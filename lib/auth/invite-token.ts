@@ -20,6 +20,19 @@ export interface InvitePayload {
   email: string;
   organization_id: string;
   role: string;
+  /**
+   * A porta que esta pessoa vai usar. Ausente = `completo`.
+   *
+   * ⚠️ OPCIONAL DE PROPÓSITO: convites emitidos antes da migration 0207 estão
+   * em caixas de entrada por aí, dentro do prazo, e continuam válidos. Exigir o
+   * campo os quebraria — e "o convite parou de funcionar" é o defeito mais caro
+   * de diagnosticar, porque só quem recebeu consegue reproduzir.
+   *
+   * Viaja ASSINADO junto com o resto: é o mesmo HMAC que já protege a
+   * organização e o papel. Aceitar escopo pelo corpo da requisição deixaria
+   * qualquer convidado se promover a acesso completo.
+   */
+  escopo?: string;
   exp: number; // epoch seconds
 }
 

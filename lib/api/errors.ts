@@ -26,6 +26,8 @@ export const ApiErrorCodes = {
   forbidden: "forbidden",
   forbidden_role: "forbidden_role",
   forbidden_tenant: "forbidden_tenant",
+  /** Escopo de acesso não alcança esta área (colaborador de projetos). */
+  forbidden_escopo: "forbidden_escopo",
   lgpd_anonymization_irreversible: "lgpd_anonymization_irreversible",
 
   // 404
