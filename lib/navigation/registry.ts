@@ -9,6 +9,7 @@ import {
   CalendarBlank,
   ChartBar,
   ChartLineUp,
+  CheckCircle,
   ClipboardText,
   ClockCountdown,
   ClockCounterClockwise,
@@ -54,7 +55,14 @@ import {
  * Doutrina: docs/doctrine/sistema-vivo.md — "por qual porta se chega até mim?"
  */
 
-export type NavGroupId = "atendimento" | "crm" | "ia" | "canais" | "analise" | "organizacao";
+export type NavGroupId =
+  | "atendimento"
+  | "crm"
+  | "ia"
+  | "atividades"
+  | "canais"
+  | "analise"
+  | "organizacao";
 
 export interface NavGroup {
   id: NavGroupId;
@@ -82,6 +90,15 @@ export interface NavDestination {
   /** Ausente = só no hub. `true` = uso diário, sobe para o sidebar. */
   sidebar?: boolean;
   healthDot?: boolean;
+  /**
+   * Contador de tarefas vencidas ao lado do rótulo.
+   *
+   * Existe por um motivo estrutural, não decorativo: sem ele, Tarefas seria
+   * uma ILHA no sentido da doutrina — uma tela que não alimenta nada e da qual
+   * nada se sabe sem abrir. O badge é a aresta de saída, e é o que faz um prazo
+   * ser visto por quem NÃO lembrou de olhar a lista.
+   */
+  overdueBadge?: boolean;
 }
 
 /**
@@ -101,6 +118,10 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: "atendimento", label: "Atendimento" },
   { id: "crm", label: "CRM" },
   { id: "ia", label: "Agente de IA", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
+  // Abaixo de IA porque é a fronteira entre operar o sistema e organizar o
+  // próprio dia: tudo acima é trabalho COM o cliente, e isto é trabalho de
+  // quem atende. Sem hub — a doutrina só pede um a partir de 5 telas.
+  { id: "atividades", label: "Atividades" },
   { id: "canais", label: "Canais" },
   { id: "analise", label: "Análise" },
   {
@@ -402,6 +423,26 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     group: "ia",
     section: "Acompanhar o agente",
     minRole: "manager",
+  },
+
+  // ---- Atividades — o próprio dia de quem atende ----
+  {
+    // Área PESSOAL: cada pessoa vê a própria lista, e o que a protege é
+    // `user_id = auth.uid()` na policy, não o papel na organização. Por isso
+    // sem `minRole` — exigir `manager` daria a um atendente o direito de não
+    // ter uma lista de afazeres, o que não é regra de negócio, é acidente.
+    //
+    // `CheckCircle` e não `ListChecks`: aquele já é de Execuções, e dois
+    // destinos com o mesmo ícone é o que faz o menu recolhido (64px, só
+    // ícones) parar de distinguir uma tela da outra.
+    href: "/app/tarefas",
+    label: "Tarefas",
+    description:
+      "Suas listas pessoais de afazeres, com prazo e prioridade — separadas do funil.",
+    icon: CheckCircle,
+    group: "atividades",
+    sidebar: true,
+    overdueBadge: true,
   },
 
   // ---- Canais — por onde as mensagens entram e saem ----

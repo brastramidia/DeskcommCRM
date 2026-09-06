@@ -399,6 +399,24 @@ export const AUDIT_ACTIONS = [
   "catalog_product.updated",
   "catalog_product.deleted",
   "catalog_product.imported",
+
+  // Tarefas pessoais (migration 0206). Auditadas como qualquer mutação, mas
+  // note o que ISTO NÃO É: a trilha registra que a pessoa mexeu na própria
+  // lista, nunca o TEXTO da tarefa — `api_audit_log` guarda ação, recurso e
+  // ator, e nada do corpo. É o que mantém a auditoria compatível com uma área
+  // cuja policy nega até o admin de plataforma.
+  //
+  // `completed` e `reopened` são códigos próprios, e não um `task.updated` que
+  // servisse para tudo: concluir é a única mutação desta tela sobre a qual
+  // alguém volta a perguntar depois ("eu tinha fechado isso?").
+  "task_list.created",
+  "task_list.renamed",
+  "task_list.deleted",
+  "task.created",
+  "task.updated",
+  "task.completed",
+  "task.reopened",
+  "task.deleted",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */
