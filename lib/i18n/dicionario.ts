@@ -6469,6 +6469,14 @@ export const DICIONARIO: Traducoes = {
   "O dia de hoje ainda está em andamento e a plataforma segue reprocessando esses números — eles vão mudar até o fim do dia.": {
     es: "El día de hoy sigue en curso y la plataforma continúa reprocesando estos números — van a cambiar hasta el final del día.",
   },
+
+
+  // ─── Situação da conexão do Google na tela da Agenda ───
+  "A agenda não está sincronizando": { es: "La agenda no está sincronizando" },
+  "Reconecte sua agenda": { es: "Reconecta tu agenda" },
+  "Falta permissão de calendário": { es: "Falta permiso de calendario" },
+  "O Google pediu para esperar": { es: "Google pidió esperar" },
+  // "Com erro" já está traduzida acima.
 };
 
 /**

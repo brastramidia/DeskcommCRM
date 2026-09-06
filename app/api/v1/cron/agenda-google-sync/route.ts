@@ -58,6 +58,7 @@ import { apenasDeMembrosAtivos } from "@/lib/agenda/google/membros";
 import { audit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { anotarSituacaoDaConexao } from "@/lib/agenda/google/situacao";
 import { classificarErroDoGoogle } from "@/lib/agenda/google/erros";
 import { doEventoDoGoogle, ehEventoNosso } from "@/lib/agenda/google/evento";
 import { listarEventos } from "@/lib/agenda/google/eventos-remotos";
@@ -159,6 +160,27 @@ export async function sincronizarAgendasDoGoogle(
       }
       if (!leitura.ok) {
         resumo.falhas += 1;
+        /*
+          A leitura falhou DE NOVO, mesmo depois da ressincronização. Aqui o
+          problema deixou de ser o `sync_token` e passou a ser a conexão —
+          token expirado, escopo revogado, calendário apagado lá.
+
+          Sem esta linha, o sync se comportava como o push: falhava a cada 5
+          minutos, contava `falhas` e deixava a conexão `healthy`. Quem olhasse
+          a tela veria uma agenda saudável que não traz evento nenhum — e o
+          cálculo de horário livre continuaria confiando nela.
+
+          `estadoDaConexaoApos` decide o que cabe a cada desfecho e devolve null
+          quando o problema é do evento, não da conexão.
+        */
+        await anotarSituacaoDaConexao(
+          admin,
+          cal.connection_id,
+          classificacao.desfecho,
+          // O loader só entrega calendário cuja conexão está `healthy` (ver o
+          // filtro em `executar`), então é esse o estado de partida — como no push.
+          "healthy",
+        );
         continue;
       }
     }

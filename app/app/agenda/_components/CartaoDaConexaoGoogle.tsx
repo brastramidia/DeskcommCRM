@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { GoogleLogo } from "@/lib/ui/icons";
+import { ROTULO_DA_SITUACAO_DA_CONEXAO, type SituacaoDaConexao } from "@/lib/agenda/tipos";
+import { GoogleLogo, Warning } from "@/lib/ui/icons";
 
 /**
  * O cartão da agenda conectada — e o caso que importa é o de quem NÃO tem.
@@ -29,6 +30,7 @@ export function CartaoDaConexaoGoogle({
   configurado,
   falta,
   contaConectada,
+  situacao,
   enderecoDeRetorno,
   linkDeConfiguracao,
 }: {
@@ -42,6 +44,15 @@ export function CartaoDaConexaoGoogle({
   /** O que falta, PELO NOME — para a tela dizer em vez de só esconder o botão. */
   falta: string[];
   contaConectada?: string | null;
+  /**
+   * A situação da conexão, de `calendar_connections.status`.
+   *
+   * Sem ela o cartão só sabia responder "tem conta conectada?" — e uma agenda
+   * cujo token expirou continua tendo conta conectada. Foi assim que 52
+   * publicações recusadas com HTTP 401 passaram despercebidas: o cartão dizia
+   * "Agenda conectada: fulano@gmail.com" enquanto nada saía nem entrava.
+   */
+  situacao?: string | null;
   /** O endereço EXATO que o Google exige registrado. Ver o bloco no JSX. */
   enderecoDeRetorno?: string;
 }) {
@@ -125,10 +136,28 @@ export function CartaoDaConexaoGoogle({
         className="flex items-center gap-2 rounded-lg border border-border bg-surface p-3"
       >
         <GoogleLogo size={16} weight="bold" className="shrink-0 text-text-muted" aria-hidden />
-        <p className="min-w-0 flex-1 truncate text-sm">
-          <span className="text-text-muted">{t("Agenda conectada:")} </span>
-          <span className="font-medium">{contaConectada}</span>
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm">
+            <span className="text-text-muted">{t("Agenda conectada:")} </span>
+            <span className="font-medium">{contaConectada}</span>
+          </p>
+          {/*
+            O rótulo vem de `ROTULO_DA_SITUACAO_DA_CONEXAO`, que já existia com
+            as sete situações em português — inclusive "Reconecte sua agenda".
+            Só `healthy` cala: dizer "Conectada" embaixo de "Agenda conectada"
+            seria repetir a mesma informação e treinar o olho a ignorar a linha,
+            justamente onde ela precisa ser lida quando algo quebrar.
+          */}
+          {situacao && situacao !== "healthy" && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-warning-fg">
+              <Warning size={12} weight="fill" aria-hidden />
+              {t(
+                ROTULO_DA_SITUACAO_DA_CONEXAO[situacao as SituacaoDaConexao] ??
+                  "A agenda não está sincronizando",
+              )}
+            </p>
+          )}
+        </div>
         <Button
           variant="outline"
           size="sm"

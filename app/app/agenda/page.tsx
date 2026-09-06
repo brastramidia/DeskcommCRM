@@ -211,6 +211,7 @@ export default async function AgendaPage() {
         fusoDeApresentacao={fusoDeApresentacao}
         googleConfigurado={googleConfigurado}
         contaConectada={conexao?.account_email ?? null}
+        situacao={conexao?.status ?? null}
         enderecoDeRetorno={enderecoDeRetorno()}
         faltaNoGoogle={faltaNoGoogle}
         // SÓ para quem administra a INSTALAÇÃO. A tela do app OAuth vive em

@@ -34,6 +34,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { PROVEDOR_GOOGLE } from "@/lib/agenda/tipos";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { anotarSituacaoDaConexao } from "@/lib/agenda/google/situacao";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 
 export const dynamic = "force-dynamic";
@@ -233,6 +234,22 @@ async function executar(req: NextRequest): Promise<Response> {
         .from("calendar_appointments")
         .update({ google_sync_error: `${efeito.classificacao.desfecho}: ${efeito.detalhe}` })
         .eq("id", linha.id);
+
+      /*
+        A TERCEIRA SUPERFÍCIE, que faltava: a própria CONEXÃO.
+
+        A coluna do compromisso e o log dizem que ESTE evento falhou. Nenhum dos
+        dois diz que a AGENDA parou de funcionar — e é essa a informação que a
+        tela precisa para pedir "reconecte".
+
+        Medido nesta instalação: 52 publicações seguidas recusadas com HTTP 401,
+        e a conexão seguiu `healthy` o tempo todo. `estadoDaConexaoApos` já sabia
+        calcular o estado certo desde que foi escrita; ninguém a chamava.
+
+        A conexão veio filtrada por `status = healthy`, então é esse o estado
+        atual — não custa uma leitura a mais para descobrir.
+      */
+      await anotarSituacaoDaConexao(admin, conexao.id, efeito.classificacao.desfecho, "healthy");
       continue;
     }
 

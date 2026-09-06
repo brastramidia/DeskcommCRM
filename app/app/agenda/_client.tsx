@@ -66,6 +66,7 @@ export function AgendaClient({
   fusoDeApresentacao,
   googleConfigurado,
   contaConectada,
+  situacao,
   enderecoDeRetorno,
   faltaNoGoogle,
   linkDeConfiguracaoDoGoogle,
@@ -75,6 +76,8 @@ export function AgendaClient({
   fusoDeApresentacao: string | null;
   googleConfigurado: boolean;
   contaConectada?: string | null;
+  /** `calendar_connections.status` — o cartão precisa dela para dizer "reconecte". */
+  situacao?: string | null;
   enderecoDeRetorno?: string;
   faltaNoGoogle: string[];
   /** Preenchido só para quem administra a instalação — ver `page.tsx`. */
@@ -278,6 +281,7 @@ export function AgendaClient({
         falta={faltaNoGoogle}
         linkDeConfiguracao={linkDeConfiguracaoDoGoogle}
         contaConectada={contaConectada}
+        situacao={situacao}
         enderecoDeRetorno={enderecoDeRetorno}
       />
 
