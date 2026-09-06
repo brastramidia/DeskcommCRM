@@ -17333,3 +17333,98 @@ create unique index if not exists ai_kbv_version_por_fonte
 create unique index if not exists ai_kbv_version_por_agente_legado
   on public.ai_knowledge_versions (agent_id, version_number)
   where knowledge_source_id is null;
+
+-- ---- tarefas pessoais, em listas (migration 0206) ----
+--
+-- A área "Atividades". Duas tabelas cujo dono é a PESSOA e não a organização —
+-- as únicas do schema com policy `user_id = auth.uid()` e, deliberadamente, SEM
+-- o bypass de `fn_is_platform_admin()`: numa instalação de revendedor o platform
+-- admin é o REVENDEDOR, e o bypass o deixaria ler a lista pessoal de quem
+-- contratou. O racional completo está no cabeçalho da migration.
+--
+-- Idempotente e auto-curativa: `if not exists` em tabela e índice, `drop policy
+-- if exists` antes de cada policy, `drop trigger if exists` antes de cada
+-- trigger. Um clone que já tenha as tabelas re-aplica isto sem efeito.
+create table if not exists public.task_lists (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  nome text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint task_lists_nome_nao_vazio check (length(btrim(nome)) > 0)
+);
+
+create unique index if not exists task_lists_org_user_nome_key
+  on public.task_lists (organization_id, user_id, nome);
+
+create index if not exists task_lists_org_user_idx
+  on public.task_lists (organization_id, user_id, created_at);
+
+create table if not exists public.task_items (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  lista_id uuid not null references public.task_lists(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  texto text not null,
+  concluida boolean not null default false,
+  concluida_em timestamptz,
+  -- Prazo de dia inteiro é gravado como a meia-noite LOCAL do dia escolhido, e
+  -- `vence_em + 24h` vira o fim do dia de quem marcou em qualquer fuso. Com um
+  -- `timestamptz` só, a tarefa de dia inteiro exibiria como o dia ANTERIOR a
+  -- oeste do UTC.
+  vence_em timestamptz,
+  vence_com_hora boolean not null default false,
+  -- 0 = nenhuma, 3 = alta. Inteiro porque a tela ordena por isto; não é enum
+  -- porque a doutrina proíbe enum (difícil de estender num clone).
+  prioridade smallint not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint task_items_texto_nao_vazio check (length(btrim(texto)) > 0),
+  constraint task_items_prioridade_valida check (prioridade between 0 and 3),
+  constraint task_items_concluida_tem_carimbo check (concluida = (concluida_em is not null)),
+  constraint task_items_hora_exige_data check (not vence_com_hora or vence_em is not null)
+);
+
+create index if not exists task_items_lista_ordem_idx
+  on public.task_items (organization_id, lista_id, concluida, prioridade desc, vence_em);
+
+-- O índice do badge da barra lateral, que roda em toda navegação. Parcial para
+-- não varrer as concluídas, que crescem para sempre e nunca entram na conta.
+create index if not exists task_items_vencidas_idx
+  on public.task_items (organization_id, user_id, vence_em)
+  where concluida = false and vence_em is not null;
+
+alter table public.task_lists enable row level security;
+alter table public.task_items enable row level security;
+
+drop policy if exists task_lists_own on public.task_lists;
+create policy task_lists_own on public.task_lists
+  for all
+  using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()))
+  with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists task_items_own on public.task_items;
+create policy task_items_own on public.task_items
+  for all
+  using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()))
+  with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+
+-- O `ALTER DEFAULT PRIVILEGES ... TO anon` do dump alcança toda tabela criada
+-- depois dele. Sem o revoke, a lista pessoal fica legível pela anon key.
+revoke all on public.task_lists from anon;
+revoke all on public.task_items from anon;
+grant select, insert, update, delete on public.task_lists to authenticated;
+grant select, insert, update, delete on public.task_items to authenticated;
+grant all on public.task_lists to service_role;
+grant all on public.task_items to service_role;
+
+drop trigger if exists trg_task_lists_updated_at on public.task_lists;
+create trigger trg_task_lists_updated_at
+  before update on public.task_lists
+  for each row execute function public.fn_set_updated_at();
+
+drop trigger if exists trg_task_items_updated_at on public.task_items;
+create trigger trg_task_items_updated_at
+  before update on public.task_items
+  for each row execute function public.fn_set_updated_at();

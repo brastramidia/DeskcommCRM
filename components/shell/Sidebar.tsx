@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { toggleSidebar } from "@/app/actions/shell/toggleSidebar";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDot";
+import { BadgeDeVencidas } from "@/components/tarefas/BadgeDeVencidas";
 import { VersionFooter } from "@/components/shell/VersionFooter";
 import { useMarcaDaInstalacao } from "@/lib/branding/contexto";
 import { GRUPO_NO_RODAPE, NAV_GROUPS, sidebarGroups } from "@/lib/navigation/registry";
@@ -163,6 +164,14 @@ export function SidebarContent({
                         {item.healthDot && (
                           <ConnectionHealthDot
                             className={cn(collapsed ? "absolute right-1.5 top-1.5" : "ml-auto")}
+                          />
+                        )}
+                        {/* Recolhido não há rótulo para o badge acompanhar, e
+                            ele vira o único sinal da tela: sobe para o canto do
+                            ícone, como a bolinha de conexão logo acima. */}
+                        {item.overdueBadge && (
+                          <BadgeDeVencidas
+                            className={cn(collapsed ? "absolute right-1 top-0.5" : "ml-auto")}
                           />
                         )}
                       </Link>

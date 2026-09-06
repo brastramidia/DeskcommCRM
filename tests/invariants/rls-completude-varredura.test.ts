@@ -162,6 +162,21 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "manager da org A NÃO lê linhas da org B (0 rows)\") prova isolamento " +
       "com `countAs` real, além do self-read do agent.",
   },
+  {
+    tabela: "task_lists",
+    razao:
+      "tests/invariants/tarefas-sao-de-quem-as-criou.test.ts prova os DOIS " +
+      "eixos com `countAs` real: cross-tenant E cross-USER dentro da mesma " +
+      "organização — este segundo é o que define a tabela, e o molde de " +
+      "rls-isolation (um usuário por org) não tem como medi-lo. Prova também " +
+      "que o platform admin NÃO bypassa, exceção deliberada da migration 0206.",
+  },
+  {
+    tabela: "task_items",
+    razao:
+      "mesmo arquivo e mesmas cinco asserções de task_lists — a policy é a " +
+      "mesma (`user_id = auth.uid()`), e o teste roda as duas em laço.",
+  },
 ];
 
 /**

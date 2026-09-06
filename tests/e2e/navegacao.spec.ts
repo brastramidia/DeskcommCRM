@@ -92,6 +92,9 @@ test.describe("navegação agrupada", () => {
       "Atendimento",
       "CRM",
       "Agente de IA",
+      // Entra depois de IA: tudo acima é trabalho COM o cliente, e Atividades é
+      // o trabalho de quem atende — a lista pessoal de afazeres.
+      "Atividades",
       "Canais",
       "Análise",
     ]);
@@ -201,11 +204,31 @@ test.describe("navegação agrupada", () => {
         titulosFora: [...nav.querySelectorAll("h2")].filter(
           (h) => h.getBoundingClientRect().bottom > r.bottom,
         ).length,
+        // ⚠️ OS NÚMEROS ENTRAM NA MENSAGEM, e não é firula.
+        //
+        // Este teste reprovava com um booleano: "não coube". Quem for consertar
+        // precisa saber POR QUANTO não coube — se faltam 8px ou 80px, a saída é
+        // outra (raspar densidade x criar um hub x tirar um item do menu). Sem o
+        // número, o conserto vira tentativa e erro contra um CI de ~20 min, e foi
+        // exatamente o que aconteceu na segunda rodada deste PR: uma correção
+        // dimensionada por estimativa, que não bastou e só se soube depois.
+        //
+        // `precisa` é o que sobra para o menu; `tem` é o que ele ocupa.
+        tem: nav.scrollHeight,
+        precisa: Math.round(r.height),
+        itens: nav.querySelectorAll("a").length,
+        grupos: nav.querySelectorAll("h2").length,
       };
     });
 
-    expect(m.titulosFora, "grupo inteiro invisível é o problema que viemos resolver").toBe(0);
-    expect(m.rola, "em 900px o menu inteiro tem de caber sem scroll").toBe(false);
+    const excesso = m.tem - m.precisa;
+    const diagnostico =
+      `menu ocupa ${m.tem}px e tem ${m.precisa}px disponíveis ` +
+      `(excesso: ${excesso}px) com ${m.itens} links em ${m.grupos} grupos. ` +
+      `Uma linha de menu custa 32px; um grupo novo, 59px.`;
+
+    expect(m.titulosFora, `grupo inteiro invisível é o problema que viemos resolver — ${diagnostico}`).toBe(0);
+    expect(m.rola, `em 900px o menu inteiro tem de caber sem scroll — ${diagnostico}`).toBe(false);
   });
 
   test.describe("mobile", () => {

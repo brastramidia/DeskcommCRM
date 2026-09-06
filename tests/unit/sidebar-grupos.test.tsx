@@ -14,6 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
+import { searchable } from "@/lib/navigation/registry";
 
 const authRef: { user: Pick<AuthUser, "is_platform_admin">; activeOrg: ActiveOrg | null } = {
   user: { is_platform_admin: false },
@@ -38,6 +39,10 @@ vi.mock("@/app/actions/shell/toggleSidebar", () => ({
 vi.mock("@/components/shell/VersionFooter", () => ({
   VersionFooter: () => null,
 }));
+// Idem: o contador de tarefas vencidas consulta a API por react-query.
+vi.mock("@/components/tarefas/BadgeDeVencidas", () => ({
+  BadgeDeVencidas: () => null,
+}));
 
 function comoPapel(role: ActiveOrg["role"]) {
   authRef.user = { is_platform_admin: false };
@@ -56,7 +61,16 @@ describe("Sidebar agrupado", () => {
       .filter(Boolean);
     // Organização não tem título aqui: seu hub (Configurações) vive no rodapé
     // fixo, fora da área que rola — medido, ele caía fora da dobra até em 1080px.
-    expect(titulos).toEqual(["Atendimento", "CRM", "Agente de IA", "Canais", "Análise"]);
+    // "Atividades" entra depois de IA: tudo acima é trabalho COM o cliente, e
+    // ela é o trabalho de quem atende — a lista pessoal de afazeres.
+    expect(titulos).toEqual([
+      "Atendimento",
+      "CRM",
+      "Agente de IA",
+      "Atividades",
+      "Canais",
+      "Análise",
+    ]);
   });
 
   it("leva às Etapas do funil sem passar por Configurações", () => {
@@ -75,14 +89,32 @@ describe("Sidebar agrupado", () => {
     expect(screen.getByRole("link", { name: "Funis" })).toHaveAttribute("href", "/app/kanban");
   });
 
-  it("desenterra Nuvemshop e Audit Log", () => {
+  it("desenterra Audit Log", () => {
     comoPapel("admin");
     render(<Sidebar collapsed={false} />);
-    // Nuvemshop não tinha link nenhum no app; Audit Log só existia via card em
-    // Configurações. Canal oficial não está aqui de propósito: virou aba de
-    // Conexões no PR #105, e Conexões é a porta.
-    expect(screen.getByRole("link", { name: /Nuvemshop/ })).toBeTruthy();
+    // Audit Log só existia via card em Configurações. Canal oficial não está
+    // aqui de propósito: virou aba de Conexões no PR #105, e Conexões é a porta.
     expect(screen.getByRole("link", { name: /Audit Log/ })).toBeTruthy();
+  });
+
+  it("Nuvemshop continua ALCANÇÁVEL, mesmo tendo saído do sidebar", () => {
+    /**
+     * ⚠️ ESTE TESTE MUDOU DE PERGUNTA, e a distinção é o ponto.
+     *
+     * Ele exigia Nuvemshop como link do sidebar. Mas o defeito que ele nasceu
+     * para impedir não era "não está no sidebar" — era "não se chega nela por
+     * lugar NENHUM do app, só digitando a URL". São coisas diferentes, e tratá-las
+     * como a mesma congelava um atalho de um clique num menu que tem altura
+     * finita: quando a dobra estourou (e2e `navegacao.spec.ts`, com o grupo
+     * "Atividades"), o item de uso mais raro do menu não podia sair porque um
+     * teste media a forma em vez do efeito.
+     *
+     * Agora ele cobra o EFEITO: estar no registro, que é o que a põe no ⌘K e no
+     * gate de completude. Se alguém apagar a entrada, este teste reprova — que é
+     * exatamente o estrago original.
+     */
+    const alcancavel = searchable(false, "admin").some((d) => d.href.includes("nuvemshop"));
+    expect(alcancavel).toBe(true);
   });
 
   it("Configurações fica no rodapé, nunca dependendo de scroll", () => {

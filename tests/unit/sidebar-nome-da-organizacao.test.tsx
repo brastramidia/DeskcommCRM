@@ -32,6 +32,7 @@ vi.mock("@/components/connections/ConnectionHealthDot", () => ({
   ConnectionHealthDot: () => null,
 }));
 vi.mock("@/components/shell/VersionFooter", () => ({ VersionFooter: () => null }));
+vi.mock("@/components/tarefas/BadgeDeVencidas", () => ({ BadgeDeVencidas: () => null }));
 
 /**
  * A marca da INSTALAÇÃO, como o SERVIDOR a entrega.
