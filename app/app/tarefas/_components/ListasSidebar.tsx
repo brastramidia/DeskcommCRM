@@ -104,9 +104,13 @@ export function ListasSidebar({
               <div
                 className={cn(
                   "flex items-center gap-1 rounded-md pl-3 pr-1 text-sm transition-colors",
+                  // `muted` (= surface-elevated) e não uma tinta de accent: sobre
+                  // Paper o accent a 50% vira um azul saturado que nenhuma outra
+                  // lista do produto usa. É o padrão das telas que já vivem em
+                  // superfície clara.
                   ativa === lista.id
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                    ? "bg-muted font-medium text-text"
+                    : "text-text-muted hover:bg-muted/40 hover:text-text",
                 )}
               >
                 <button

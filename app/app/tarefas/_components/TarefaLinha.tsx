@@ -64,14 +64,14 @@ export function TarefaLinha({ tarefa, onAlterar, onApagar }: Props) {
   }
 
   return (
-    <li className="group flex items-start gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent/40">
+    <li className="group flex items-start gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
       {/* O círculo do Lembretes. Vazio quando pendente, preenchido quando feito. */}
       <button
         type="button"
         onClick={() => onAlterar(tarefa.id, { concluida: !tarefa.concluida })}
         aria-pressed={tarefa.concluida}
         aria-label={tarefa.concluida ? t("Reabrir tarefa") : t("Concluir tarefa")}
-        className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-0.5 shrink-0 rounded-full text-text-muted transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {tarefa.concluida ? (
           <CheckCircle size={20} weight="fill" className="text-primary" />

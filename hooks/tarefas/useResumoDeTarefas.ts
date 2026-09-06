@@ -14,7 +14,11 @@ import { apiClient } from "@/lib/api/client";
 export function useResumoDeTarefas() {
   return useQuery({
     queryKey: ["tarefas", "resumo"],
-    queryFn: () => apiClient.get<ResumoDeTarefas>("/api/v1/tarefas/resumo"),
+    // `.data`: `apiClient` devolve o envelope `{ data, meta }` cru — ver a nota
+    // em TarefasClient. Aqui o efeito seria mais mudo: `data?.vencidas` daria
+    // `undefined`, o badge nunca acenderia, e nada acusaria o defeito.
+    queryFn: async () =>
+      (await apiClient.get<{ data: ResumoDeTarefas }>("/api/v1/tarefas/resumo")).data,
     refetchInterval: 60_000,
     // A tela de Tarefas invalida esta chave ao concluir algo: sem isso, marcar a
     // última vencida deixaria o badge aceso por até um minuto, e o usuário

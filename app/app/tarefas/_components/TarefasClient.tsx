@@ -45,9 +45,24 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
   const t = useT();
   const qc = useQueryClient();
 
+  /**
+   * ⚠️ `.data` NÃO É OPCIONAL AQUI — e omiti-lo foi o defeito que derrubou esta
+   * tela em produção.
+   *
+   * `apiClient` devolve o CORPO CRU da resposta, e toda rota `/api/v1` responde
+   * no envelope `{ data, meta }` (lib/api/wrappers.ts). Quem consome desembrulha,
+   * como `useChannelSessions` já fazia. Tipar o genérico como o array direto é
+   * uma afirmação que o TypeScript aceita sem conferir: em runtime chega o objeto.
+   *
+   * O modo de falha foi traiçoeiro. O primeiro render usa `initialData`, que vem
+   * do Server Component e É um array — a tela abria e funcionava. Só na primeira
+   * revalidação `listas` virava `{data:[…]}`, e o render seguinte morria em
+   * `listas.some is not a function`, dentro do boundary de erro do segmento.
+   */
   const { data: listas = [] } = useQuery({
     queryKey: LISTAS_KEY,
-    queryFn: () => apiClient.get<ListaComPendentes[]>("/api/v1/tarefas/listas"),
+    queryFn: async () =>
+      (await apiClient.get<{ data: ListaComPendentes[] }>("/api/v1/tarefas/listas")).data,
     initialData: listasIniciais,
   });
 
@@ -68,7 +83,8 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
 
   const { data: tarefas, isLoading } = useQuery({
     queryKey: tarefasKey(ativa ?? ""),
-    queryFn: () => apiClient.get<Tarefa[]>(`/api/v1/tarefas?lista_id=${ativa}`),
+    queryFn: async () =>
+      (await apiClient.get<{ data: Tarefa[] }>(`/api/v1/tarefas?lista_id=${ativa}`)).data,
     enabled: ativa !== null,
   });
 
@@ -79,7 +95,10 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
   }
 
   const criarLista = useMutation({
-    mutationFn: (nome: string) => apiClient.post<ListaComPendentes>("/api/v1/tarefas/listas", { nome }),
+    // Idem: o `onSuccess` abaixo LÊ esta resposta para abrir a lista recém-criada.
+    // As outras mutações não leem a delas, e por isso não precisam do desembrulho.
+    mutationFn: async (nome: string) =>
+      (await apiClient.post<{ data: ListaComPendentes }>("/api/v1/tarefas/listas", { nome })).data,
     onError: showApiError,
     // Abre a lista recém-criada: quem acabou de nomeá-la vai escrever nela.
     //
@@ -137,7 +156,24 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
   }, [tarefas, filtro, soPrioritarias]);
 
   return (
-    <div className="flex h-full gap-4">
+    /*
+      A SUPERFÍCIE CLARA, DECLARADA — não herdada.
+
+      O shell (`AppShell`) pinta `bg-background`, que nesta instalação é a paleta
+      Ink, ESCURA. Tela que não declara nada nasce escura, e foi o que aconteceu
+      aqui: Tarefas destoava de Follow-ups, Desempenho e Configurações.
+
+      `data-superficie="clara"` é o mecanismo do produto para isso (ver o bloco
+      em `app/globals.css`): ele redefine os tokens de cor para esta subárvore,
+      sem tocar no tema escolhido pela pessoa e sem congelar a cor de marca do
+      revendedor. O `-m-6` + `p-6` anula o padding do `<main>` para o claro
+      chegar até a borda — senão sobra uma moldura escura em volta, que é o que
+      denuncia um tema aplicado pela metade. Mesmo desenho de `metrics/page.tsx`.
+    */
+    <div
+      data-superficie="clara"
+      className="-m-6 flex min-h-[calc(100%+3rem)] gap-4 bg-bg p-6 text-text"
+    >
       <ListasSidebar
         listas={listas}
         ativa={ativa}
