@@ -92,6 +92,9 @@ test.describe("navegação agrupada", () => {
       "Atendimento",
       "CRM",
       "Agente de IA",
+      // Entra depois de IA: tudo acima é trabalho COM o cliente, e Atividades é
+      // o trabalho de quem atende — a lista pessoal de afazeres.
+      "Atividades",
       "Canais",
       "Análise",
     ]);
