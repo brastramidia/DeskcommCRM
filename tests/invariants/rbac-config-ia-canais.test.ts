@@ -219,11 +219,37 @@ describe("0150 — a dívida de RBAC não cresce", () => {
   });
 
   it("nenhuma tabela NOVA entra com policy ALL só-tenancy", () => {
+    /**
+     * ⚠️ A SAÍDA POR DONO-DE-LINHA, e por que ela NÃO afrouxa este gate.
+     *
+     * O perigo que a 0150 nomeia é papel fraco reescrevendo CONFIGURAÇÃO
+     * COMPARTILHADA: o `system_prompt` que o bot fala com cliente real, o canal
+     * de WhatsApp, a credencial de IA. Todas são linhas da ORGANIZAÇÃO — quem
+     * as edita mexe no que é dos outros, e por isso a única defesa possível é o
+     * papel.
+     *
+     * `user_id = auth.uid()` responde a outra pergunta e responde MAIS forte:
+     * a linha não é de ninguém além do dono, e o papel mais fraco do tenant não
+     * alcança a linha de nenhum colega — nem para ler. Exigir `role_at_least`
+     * numa tabela assim não protegeria mais nada; só decidiria QUEM tem direito
+     * a ter uma lista pessoal, que não é uma pergunta de segurança.
+     *
+     * A saída é ESTREITA de propósito, e é o `and` que a mantém assim: o
+     * `auth.uid()` tem de estar nas DUAS metades da policy — no `USING` e no
+     * check efetivo. Uma policy que filtre a LEITURA por dono e deixe a ESCRITA
+     * em tenancy nua continua reprovando aqui, que é exatamente o buraco que
+     * alguém abriria sem perceber. (`with_check` nulo numa policy ALL significa
+     * "o mesmo do USING", e é o que o `coalesce` reproduz.)
+     */
     const atuais = sql(`
       select coalesce(string_agg(distinct tablename, ',' order by tablename), '') from pg_policies
        where schemaname = 'public'
          and cmd = 'ALL'
-         and (coalesce(qual, '') || coalesce(with_check, '')) not like '%role_at_least%';
+         and (coalesce(qual, '') || coalesce(with_check, '')) not like '%role_at_least%'
+         and not (
+           coalesce(qual, '') like '%auth.uid()%'
+           and coalesce(nullif(with_check, ''), coalesce(qual, '')) like '%auth.uid()%'
+         );
     `)
       .trim()
       .split(",")
@@ -231,6 +257,22 @@ describe("0150 — a dívida de RBAC não cresce", () => {
 
     const novas = atuais.filter((t) => !DIVIDA_RBAC_CONHECIDA.has(t));
     expect(novas).toEqual([]);
+  });
+
+  it("CONTROLE da saída: as tabelas pessoais têm auth.uid() nas DUAS metades", () => {
+    // Sem isto, a exceção acima seria uma afirmação sobre o schema que ninguém
+    // confere: bastaria alguém trocar o `with check` por tenancy nua para a
+    // tabela continuar passando por um motivo que deixou de valer.
+    const mancas = sql(`
+      select coalesce(string_agg(distinct tablename, ',' order by tablename), '') from pg_policies
+       where schemaname = 'public'
+         and tablename in ('task_lists', 'task_items')
+         and not (
+           coalesce(qual, '') like '%auth.uid()%'
+           and coalesce(nullif(with_check, ''), coalesce(qual, '')) like '%auth.uid()%'
+         );
+    `);
+    expect(mancas.trim()).toBe("");
   });
 
   it("CONTROLE: a allowlist não guarda tabela que já não existe (senão ela cobre o futuro por acidente)", () => {

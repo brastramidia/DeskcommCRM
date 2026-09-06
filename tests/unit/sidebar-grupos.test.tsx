@@ -38,6 +38,10 @@ vi.mock("@/app/actions/shell/toggleSidebar", () => ({
 vi.mock("@/components/shell/VersionFooter", () => ({
   VersionFooter: () => null,
 }));
+// Idem: o contador de tarefas vencidas consulta a API por react-query.
+vi.mock("@/components/tarefas/BadgeDeVencidas", () => ({
+  BadgeDeVencidas: () => null,
+}));
 
 function comoPapel(role: ActiveOrg["role"]) {
   authRef.user = { is_platform_admin: false };
@@ -56,7 +60,16 @@ describe("Sidebar agrupado", () => {
       .filter(Boolean);
     // Organização não tem título aqui: seu hub (Configurações) vive no rodapé
     // fixo, fora da área que rola — medido, ele caía fora da dobra até em 1080px.
-    expect(titulos).toEqual(["Atendimento", "CRM", "Agente de IA", "Canais", "Análise"]);
+    // "Atividades" entra depois de IA: tudo acima é trabalho COM o cliente, e
+    // ela é o trabalho de quem atende — a lista pessoal de afazeres.
+    expect(titulos).toEqual([
+      "Atendimento",
+      "CRM",
+      "Agente de IA",
+      "Atividades",
+      "Canais",
+      "Análise",
+    ]);
   });
 
   it("leva às Etapas do funil sem passar por Configurações", () => {

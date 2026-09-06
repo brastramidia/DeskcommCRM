@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tarefas pessoais — a única área cujo dono é a pessoa, não a organização",
+    "subtitle": "listas do jeito do Lembretes; a porta na navegação e o badge que impede a feature de ser ilha",
+    "output": "tarefas-pessoais.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "casca", "label": "A casca do app (como se chega)" },
+    { "id": "humano", "label": "O que a pessoa vê" },
+    { "id": "borda", "label": "Borda HTTP (viewer+, escopo por usuário)" },
+    { "id": "regra", "label": "Regras puras" },
+    { "id": "dados", "label": "Banco" }
+  ],
+  "mainPath": ["registry", "pagina", "client", "r_tarefas", "items"],
+  "nodes": [
+    { "id": "registry", "lane": "casca", "col": 1, "type": "service", "label": "navigation/registry.ts", "sublabel": "grupo 'atividades' · sidebar: true · overdueBadge: true" },
+    { "id": "sidebar", "lane": "casca", "col": 2, "type": "frontend", "label": "shell/Sidebar", "sublabel": "projeção pura do registro — não decide nada" },
+    { "id": "badge", "lane": "casca", "col": 3, "type": "frontend", "label": "BadgeDeVencidas", "sublabel": "A ARESTA DE SAÍDA · poll 60s · não desenha zero" },
+
+    { "id": "pagina", "lane": "humano", "col": 1, "type": "frontend", "label": "/app/tarefas (page)", "sublabel": "Server Component · carrega as listas no primeiro paint" },
+    { "id": "client", "lane": "humano", "col": 2, "type": "frontend", "label": "TarefasClient", "sublabel": "lista ativa DERIVADA do cache · invalida as 3 chaves" },
+    { "id": "listas_ui", "lane": "humano", "col": 3, "type": "frontend", "label": "ListasSidebar", "sublabel": "criar · renomear · apagar (com o nº de pendentes no aviso)" },
+    { "id": "linha", "lane": "humano", "col": 4, "type": "frontend", "label": "TarefaLinha", "sublabel": "círculo · edição inline · prazo · prioridade 0-3" },
+
+    { "id": "r_listas", "lane": "borda", "col": 1, "type": "api", "label": "GET/POST /api/v1/tarefas/listas", "sublabel": "user_id vem da SESSÃO, nunca do corpo" },
+    { "id": "r_lista_id", "lane": "borda", "col": 2, "type": "api", "label": "PATCH/DELETE .../listas/[id]", "sublabel": "409 no nome repetido · cascade é do schema" },
+    { "id": "r_tarefas", "lane": "borda", "col": 3, "type": "api", "label": "GET/POST /api/v1/tarefas", "sublabel": "ordem = a do índice: pendentes, prioridade, prazo" },
+    { "id": "r_tarefa_id", "lane": "borda", "col": 4, "type": "api", "label": "PATCH/DELETE /api/v1/tarefas/[id]", "sublabel": "carimba concluida_em com o relógio do SERVIDOR" },
+    { "id": "r_resumo", "lane": "borda", "col": 5, "type": "api", "label": "GET /api/v1/tarefas/resumo", "sublabel": "count exato, head: true — roda em toda navegação" },
+
+    { "id": "schema", "lane": "regra", "col": 2, "type": "service", "label": "schemas/tarefas.ts", "sublabel": "Zod · estaVencida · cortesDeVencimento — regra com UM dono" },
+    { "id": "datas", "lane": "regra", "col": 3, "type": "service", "label": "tarefas/datas.ts", "sublabel": "instante ↔ campos do form · meia-noite LOCAL é a âncora" },
+    { "id": "consultas", "lane": "regra", "col": 1, "type": "service", "label": "tarefas/consultas.ts", "sublabel": "listas + pendentes — dois chamadores, uma regra" },
+
+    { "id": "lists", "lane": "dados", "col": 1, "type": "database", "label": "task_lists", "sublabel": "policy user_id = auth.uid() · SEM bypass de platform admin" },
+    { "id": "items", "lane": "dados", "col": 2, "type": "database", "label": "task_items", "sublabel": "vence_em + vence_com_hora · prioridade 0-3 · índice parcial de vencidas" },
+    { "id": "audit", "lane": "dados", "col": 3, "type": "database", "label": "api_audit_log", "sublabel": "task_list.* e task.* — a AÇÃO, nunca o texto da tarefa" }
+  ],
+  "edges": [
+    { "id": "e1", "from": "registry", "to": "sidebar", "label": "sidebarGroups() — o menu é projeção, não decisão" },
+    { "id": "e2", "from": "registry", "to": "pagina", "label": "A PORTA: grupo 'atividades' → /app/tarefas" },
+    { "id": "e3", "from": "sidebar", "to": "badge", "label": "desenha quando o destino traz overdueBadge" },
+    { "id": "e4", "from": "badge", "to": "r_resumo", "label": "useResumoDeTarefas · refetchInterval 60s" },
+
+    { "id": "e5", "from": "pagina", "to": "consultas", "label": "carregarListasComPendentes(org, user)" },
+    { "id": "e6", "from": "pagina", "to": "client", "label": "listasIniciais — a coluna esquerda não pisca" },
+    { "id": "e7", "from": "consultas", "to": "lists", "label": "select das listas do usuário" },
+    { "id": "e8", "from": "consultas", "to": "items", "label": "select lista_id where concluida = false → conta em JS" },
+
+    { "id": "e9", "from": "client", "to": "listas_ui", "label": "listas + callbacks" },
+    { "id": "e10", "from": "client", "to": "linha", "label": "tarefa + onAlterar/onApagar" },
+    { "id": "e11", "from": "listas_ui", "to": "client", "label": "onCriar · onRenomear · onApagar · onSelecionar" },
+    { "id": "e12", "from": "linha", "to": "client", "label": "patch parcial — a linha não sabe fazer HTTP" },
+    { "id": "e13", "from": "linha", "to": "datas", "label": "formatarPrazo · montarPrazo · paraCampoDe*" },
+    { "id": "e14", "from": "linha", "to": "schema", "label": "estaVencida · SINAL_DA_PRIORIDADE" },
+    { "id": "e15", "from": "datas", "to": "schema", "label": "a MESMA âncora de meia-noite local que estaVencida assume" },
+
+    { "id": "e16", "from": "client", "to": "r_listas", "label": "GET na revalidação · POST { nome }" },
+    { "id": "e17", "from": "client", "to": "r_lista_id", "label": "PATCH { nome } · DELETE" },
+    { "id": "e18", "from": "client", "to": "r_tarefas", "label": "GET ?lista_id · POST { lista_id, texto }" },
+    { "id": "e19", "from": "client", "to": "r_tarefa_id", "label": "PATCH { texto? concluida? vence_em? prioridade? } · DELETE" },
+
+    { "id": "e20", "from": "r_listas", "to": "consultas", "label": "a MESMA função da página — sem segunda cópia da contagem" },
+    { "id": "e21", "from": "r_listas", "to": "schema", "label": "listaCreateSchema" },
+    { "id": "e22", "from": "r_lista_id", "to": "schema", "label": "listaPatchSchema" },
+    { "id": "e23", "from": "r_tarefas", "to": "schema", "label": "tarefaCreateSchema · COLUNAS_DA_TAREFA" },
+    { "id": "e24", "from": "r_tarefa_id", "to": "schema", "label": "tarefaPatchSchema" },
+    { "id": "e25", "from": "r_resumo", "to": "schema", "label": "cortesDeVencimento — o filtro do banco sai da regra da tela" },
+
+    { "id": "e26", "from": "r_listas", "to": "lists", "label": "insert com user_id da sessão" },
+    { "id": "e27", "from": "r_lista_id", "to": "lists", "label": "update/delete .eq(org).eq(user).eq(id)" },
+    { "id": "e28", "from": "r_tarefas", "to": "items", "label": "insert · select ordenado" },
+    { "id": "e29", "from": "r_tarefa_id", "to": "items", "label": "update — concluida e concluida_em no MESMO update" },
+    { "id": "e30", "from": "r_resumo", "to": "items", "label": "count exato pelo índice parcial de vencidas" },
+    { "id": "e31", "from": "lists", "to": "items", "label": "FK ON DELETE CASCADE — apagar a lista leva as tarefas" },
+
+    { "id": "e32", "from": "r_listas", "to": "audit", "label": "task_list.created" },
+    { "id": "e33", "from": "r_lista_id", "to": "audit", "label": "task_list.renamed · task_list.deleted" },
+    { "id": "e34", "from": "r_tarefas", "to": "audit", "label": "task.created" },
+    { "id": "e35", "from": "r_tarefa_id", "to": "audit", "label": "task.completed · task.reopened · task.updated · task.deleted" }
+  ],
+  "naoLigacoes": [
+    {
+      "de": "task_items",
+      "para": "crm_leads / contacts / conversations",
+      "porque": "É a decisão de produto que define a feature. Amarrar uma tarefa a um lead obrigaria a inventar um cliente para todo afazer interno ('renovar o certificado'), e a timeline do cliente receberia linhas que não são dele. Quem quiser cobrança ligada a um lead já tem follow-up e agenda."
+    },
+    {
+      "de": "task_lists / task_items",
+      "para": "fn_is_platform_admin()",
+      "porque": "Única exceção deliberada do schema. Numa instalação de revendedor o platform admin é o REVENDEDOR: o bypass o deixaria ler a lista pessoal de quem contratou. Consequência aceita e escrita: nem o dono do servidor alcança a tabela pela tela, só pela service key. Medido por tests/invariants/tarefas-sao-de-quem-as-criou.test.ts."
+    },
+    {
+      "de": "api_audit_log",
+      "para": "o texto da tarefa",
+      "porque": "A trilha registra ação, recurso e ator — nunca o corpo. É o que mantém a auditoria compatível com uma área cuja policy nega até o admin de plataforma: auditar o texto reabriria pela trilha a leitura que a policy fecha."
+    }
+  ]
+}

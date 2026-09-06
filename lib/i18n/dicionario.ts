@@ -6403,6 +6403,59 @@ export const DICIONARIO: Traducoes = {
     { es: "Desconectar borra el token guardado. La pantalla de Meta Ads vuelve a pedir una conexión, y no se pierde ningún dato histórico — aquí no se almacena nada." },
   "Não consegui desconectar agora.": { es: "No pude desconectar ahora." },
 
+
+  // ─── Tarefas pessoais (app/app/tarefas + o badge na barra lateral) ───
+  // "Atividades" já está traduzida acima (rótulo do grupo da navegação).
+  //
+  // ⚠️ As quatro abaixo chegam a `t()` por VARIÁVEL (os rótulos de prioridade
+  // e os filtros vêm de um array), e o gate de i18n varre o AST — ele não vê
+  // literal que não está escrito na chamada. Sem estas linhas a tela ficaria
+  // meio traduzida em espanhol e nenhum teste reclamaria.
+  // "Alta", "Todas", "Hoje", "Ontem", "Salvar", "Renomear", "Cancelar" e
+  // "Prioridade" não entram: ou já existem acima, ou são iguais em espanhol —
+  // e este arquivo só quer o que DIFERE.
+  Baixa: { es: "Baja" },
+  Pendentes: { es: "Pendientes" },
+  "Concluídas": { es: "Completadas" },
+  "Tarefas": { es: "Tareas" },
+  "Suas listas pessoais de afazeres, com prazo e prioridade — separadas do funil.": {
+    es: "Tus listas personales de pendientes, con plazo y prioridad — separadas del embudo.",
+  },
+  "Minhas listas": { es: "Mis listas" },
+  "Nova lista": { es: "Nueva lista" },
+  "Nome da lista": { es: "Nombre de la lista" },
+  "Renomear lista": { es: "Renombrar lista" },
+  "Apagar lista": { es: "Eliminar lista" },
+  "Opções da lista": { es: "Opciones de la lista" },
+  "Nenhuma lista ainda": { es: "Todavía no hay listas" },
+  "Crie uma lista para começar a anotar o que precisa fazer.": {
+    es: "Crea una lista para empezar a anotar lo que tienes que hacer.",
+  },
+  "As tarefas dentro dela também somem — há": {
+    es: "Las tareas que contiene también desaparecen — hay",
+  },
+  "As tarefas dentro dela também somem. Não dá para desfazer.": {
+    es: "Las tareas que contiene también desaparecen. No se puede deshacer.",
+  },
+  "Nova tarefa": { es: "Nueva tarea" },
+  "Editar tarefa": { es: "Editar tarea" },
+  "Apagar tarefa": { es: "Eliminar tarea" },
+  "Concluir tarefa": { es: "Completar tarea" },
+  "Reabrir tarefa": { es: "Reabrir tarea" },
+  "Data e horário": { es: "Fecha y hora" },
+  "Definir horário": { es: "Definir hora" },
+  "Só prioritárias": { es: "Solo prioritarias" },
+  "Nada pendente por aqui.": { es: "Nada pendiente por aquí." },
+  "Nenhuma tarefa com esse filtro.": { es: "Ninguna tarea con ese filtro." },
+  "Tarefas vencidas": { es: "Tareas vencidas" },
+  "Sem prioridade": { es: "Sin prioridad" },
+  "Média": { es: "Media" },
+  "vencida": { es: "vencida" },
+  "pendentes": { es: "pendientes" },
+  "Amanhã": { es: "Mañana" },
+  "Data": { es: "Fecha" },
+  "Apagar": { es: "Eliminar" },
+  "Não dá para desfazer.": { es: "No se puede deshacer." },
 };
 
 /**

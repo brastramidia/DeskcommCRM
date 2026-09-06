@@ -60,6 +60,7 @@ vi.mock("@/components/connections/ConnectionHealthDot", () => ({
   ConnectionHealthDot: () => null,
 }));
 vi.mock("@/components/shell/VersionFooter", () => ({ VersionFooter: () => null }));
+vi.mock("@/components/tarefas/BadgeDeVencidas", () => ({ BadgeDeVencidas: () => null }));
 
 const usuario = {
   id: "00000000-0000-4000-8000-000000000001",
