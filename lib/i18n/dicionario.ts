@@ -6456,6 +6456,19 @@ export const DICIONARIO: Traducoes = {
   "Data": { es: "Fecha" },
   "Apagar": { es: "Eliminar" },
   "Não dá para desfazer.": { es: "No se puede deshacer." },
+
+  // ─── Resumo do período em Meta Ads (app/app/ads/meta) ───
+  "Valor gasto": { es: "Valor gastado" },
+  "Custo médio por resultado": { es: "Costo medio por resultado" },
+  "Campanhas entregando": { es: "Campañas entregando" },
+  // "no período" já está traduzida acima.
+  "objetivos diferentes somados": { es: "objetivos distintos sumados" },
+  "não se calcula com objetivos misturados": {
+    es: "no se calcula con objetivos mezclados",
+  },
+  "O dia de hoje ainda está em andamento e a plataforma segue reprocessando esses números — eles vão mudar até o fim do dia.": {
+    es: "El día de hoy sigue en curso y la plataforma continúa reprocesando estos números — van a cambiar hasta el final del día.",
+  },
 };
 
 /**

@@ -17,6 +17,9 @@ import { useMetaAdAccounts, useMetaCampaigns } from "@/hooks/ads/useMetaAds";
 import { ApiError } from "@/lib/api/types";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
+import { resumirCampanhas } from "@/lib/plataformas-de-anuncio/meta/resumo";
+
+import { ResumoDoPeriodo } from "./ResumoDoPeriodo";
 import { TabelaDeCampanhas } from "./TabelaDeCampanhas";
 
 /**
@@ -70,8 +73,25 @@ const STATUS_DA_CONTA: Record<number, string> = {
   101: "encerrada",
 };
 
+/**
+ * A data como o FUSO DE QUEM OLHA a vê — não em UTC.
+ *
+ * ⚠️ Era `toISOString().slice(0,10)`, que devolve o dia em UTC. No Brasil isso
+ * erra por um dia toda noite: às 21h de terça, `toISOString()` já diz
+ * quarta-feira. Nas janelas de 7 ou 30 dias o deslocamento passava despercebido;
+ * com "Hoje" e "Ontem", que são um dia só, ele viraria o dado inteiro — a tela
+ * mostraria amanhã, ou ontem, sem nada indicando isso.
+ */
 function comoData(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
+/** Um dia só — o formato que "Hoje" e "Ontem" pedem. */
+function umDia(d: Date): { de: string; ate: string } {
+  const s = comoData(d);
+  return { de: s, ate: s };
 }
 
 /** Ontem — nunca hoje. O dia corrente está incompleto e a plataforma ainda o reprocessa. */
@@ -86,6 +106,8 @@ function haDias(dias: number): { de: string; ate: string } {
 }
 
 const PERSONALIZADO = "personalizado";
+const HOJE = "hoje";
+const ONTEM = "ontem";
 
 interface Props {
   contaPadrao: string | null;
@@ -128,7 +150,9 @@ export function MetaAdsClient({ contaPadrao }: Props) {
 
   function trocarPreset(valor: string) {
     setPreset(valor);
-    if (valor !== PERSONALIZADO) setIntervalo(haDias(Number(valor)));
+    if (valor === HOJE) setIntervalo(umDia(new Date()));
+    else if (valor === ONTEM) setIntervalo(umDia(ontem()));
+    else if (valor !== PERSONALIZADO) setIntervalo(haDias(Number(valor)));
   }
 
   function mensagemDeErro(erro: unknown): string {
@@ -175,6 +199,14 @@ export function MetaAdsClient({ contaPadrao }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              {/*
+                "Hoje" existe apesar de o dia corrente ser INCOMPLETO — ver o
+                aviso que aparece ao selecioná-lo. Quem acompanha campanha no dia
+                precisa do parcial; o que não pode é o parcial passar por
+                fechado.
+              */}
+              <SelectItem value={HOJE}>{t("Hoje")}</SelectItem>
+              <SelectItem value={ONTEM}>{t("Ontem")}</SelectItem>
               <SelectItem value="7">{t("Últimos 7 dias")}</SelectItem>
               <SelectItem value="14">{t("Últimos 14 dias")}</SelectItem>
               <SelectItem value="30">{t("Últimos 30 dias")}</SelectItem>
@@ -239,8 +271,29 @@ export function MetaAdsClient({ contaPadrao }: Props) {
         </div>
       )}
 
+      {/*
+        O DIA CORRENTE É PARCIAL, e a tela precisa dizer isso.
+
+        Este arquivo excluía hoje de propósito (ver `ontem()`): a plataforma
+        ainda reprocessa o dia em curso, então o número muda ao longo do dia e
+        não bate com o Gerenciador consultado mais tarde. A opção foi pedida para
+        acompanhar campanha no mesmo dia — legítimo —, mas entregá-la sem aviso
+        transformaria "parcial" em "errado" na cabeça de quem lê.
+      */}
+      {preset === HOJE && !erro && (
+        <p className="rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-fg">
+          {t(
+            "O dia de hoje ainda está em andamento e a plataforma segue reprocessando esses números — eles vão mudar até o fim do dia.",
+          )}
+        </p>
+      )}
+
       {campanhas.data && !erro && (
         <>
+          <ResumoDoPeriodo
+            resumo={resumirCampanhas(campanhas.data.data.campanhas)}
+            moeda={moeda}
+          />
           <TabelaDeCampanhas linhas={campanhas.data.data.campanhas} moeda={moeda} />
           {/*
             Sem carimbo, uma tabela que falhou ao atualizar é visualmente

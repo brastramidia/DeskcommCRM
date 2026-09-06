@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useT } from "@/hooks/i18n/useT";
+import { cn } from "@/lib/utils";
 import {
   ordenarParaTela,
   rotuloDoIndicador,
@@ -194,16 +195,54 @@ export function TabelaDeCampanhas({ linhas, moeda }: Props) {
         <TableBody>
           {ordenadas.map((linha) => {
             const rotulo = rotuloDoIndicador(linha.resultado.indicador);
+            /*
+              QUEM ESTÁ ENTREGANDO FICA EM PRIMEIRO PLANO.
+
+              A maior parte desta tabela costuma ser linha de zero — campanha
+              pausada continua listada, com as mesmas 14 colunas e o mesmo peso
+              visual de quem está gastando agora. Ler a tabela virava varrer
+              linha a linha atrás das poucas que importam.
+
+              `veiculacao` e não `status`: é ela que diz se está ENTREGANDO. Uma
+              campanha ligada cujo conjunto está pausado não entrega nada, e
+              destacá-la seria repetir na cor o engano que a coluna "Veiculação"
+              existe para desfazer.
+
+              Recuo por COR e não por opacidade: opacidade apagaria também a
+              borda e o fundo fixo da coluna de nome, que precisam continuar
+              opacos para o scroll horizontal não deixar texto passando por baixo.
+            */
+            const entregando = linha.veiculacao === "ACTIVE";
             return (
-              <TableRow key={linha.campanhaId}>
-                <TableCell className="sticky left-0 z-10 max-w-[22rem] bg-bg font-medium">
+              <TableRow
+                key={linha.campanhaId}
+                className={cn(!entregando && "text-text-subtle")}
+              >
+                <TableCell
+                  className={cn(
+                    "sticky left-0 z-10 max-w-[22rem] bg-bg",
+                    entregando ? "font-medium text-text" : "font-normal",
+                  )}
+                >
                   <span className="block truncate" title={linha.nome}>
                     {linha.nome}
                   </span>
                 </TableCell>
                 <TableCell>{estado(linha.status)}</TableCell>
                 <TableCell>{estado(linha.veiculacao)}</TableCell>
-                <TableCell className="text-right">
+                {/*
+                  Resultado e Valor Gasto são as duas perguntas que trazem
+                  alguém aqui — "rendeu quanto" e "custou quanto". Elas tinham o
+                  mesmo peso de CPM, frequência e ThruPlays, que são métricas de
+                  diagnóstico, consultadas depois. O peso separa as duas coisas
+                  sem esconder nenhuma.
+                */}
+                <TableCell
+                  className={cn(
+                    "text-right font-semibold tabular-nums",
+                    entregando && "text-text",
+                  )}
+                >
                   <Numero valor={linha.resultado.valor} />
                   {/*
                     O rótulo do indicador viaja com o número. "15" sozinho não
@@ -220,7 +259,14 @@ export function TabelaDeCampanhas({ linhas, moeda }: Props) {
                 <TableCell className="text-right">
                   {dinheiro(linha.resultado.custoPorResultado)}
                 </TableCell>
-                <TableCell className="text-right">{dinheiro(linha.gasto)}</TableCell>
+                <TableCell
+                  className={cn(
+                    "text-right font-semibold tabular-nums",
+                    entregando && "text-text",
+                  )}
+                >
+                  {dinheiro(linha.gasto)}
+                </TableCell>
                 <TableCell className="text-right">
                   <Numero valor={linha.impressoes} />
                 </TableCell>
