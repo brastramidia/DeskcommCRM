@@ -471,7 +471,23 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     // A página não filtra por papel, mas as Server Actions de conectar e
     // desconectar exigem admin — mostrar a um viewer seria oferecer botão morto.
     minRole: "admin",
-    sidebar: true,
+    // ⚠️ SAIU DO SIDEBAR quando o grupo "Atividades" entrou, e é a terceira vez
+    // que esta tela paga o preço da dobra — depois de Provedores e Execuções,
+    // pelo MESMO e2e (`navegacao.spec.ts`, "em 900px o menu inteiro tem de
+    // caber sem scroll"), que reprovou a rodada anterior deste PR.
+    //
+    // Escolhida entre os candidatos porque conectar loja é tarefa de UMA vez:
+    // depois de conectada, ninguém volta aqui. O alternativo era Roteadores, que
+    // se ajusta ao longo do tempo.
+    //
+    // ⚠️ E ela CONTINUA tendo porta: segue no registro, logo aparece no ⌘K e o
+    // gate de completude a aceita. O que se perdeu foi o atalho de um clique, não
+    // a alcançabilidade — que era o problema real de quando esta tela não tinha
+    // link NENHUM no app inteiro (ver o comentário logo acima).
+    //
+    // Este grupo não tem hub (a doutrina só pede um a partir de 5 telas, e
+    // "canais" tem 3). Se Canais crescer, é hub que se cria — e aí esta linha
+    // vira `section:` em vez de sumiço.
   },
   {
     href: "/app/webhooks",
