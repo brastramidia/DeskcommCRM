@@ -17149,9 +17149,7 @@ grant select, insert, update, delete on public.ad_conversion_dispatches to servi
 drop trigger if exists trg_ad_conversion_dispatches_updated_at on public.ad_conversion_dispatches;
 create trigger trg_ad_conversion_dispatches_updated_at
   before update on public.ad_conversion_dispatches
-create unique index if not exists ai_kbv_version_por_agente_legado
-  on public.ai_knowledge_versions (agent_id, version_number)
-  where knowledge_source_id is null;
+  for each row execute function public.fn_set_updated_at();
 
 -- ---- tarefas pessoais, em listas (migration 0206) ----
 --
