@@ -88,15 +88,47 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
     enabled: ativa !== null,
   });
 
-  function revalidar() {
-    qc.invalidateQueries({ queryKey: LISTAS_KEY });
+  /**
+   * O QUE PRECISA VOLTAR AO SERVIDOR DEPOIS DE UMA MUDANÇA — E O QUE NÃO.
+   *
+   * Antes havia um `revalidar()` que invalidava as TRÊS chaves em toda mutação:
+   * as tarefas da lista, o contador de pendentes de cada lista e o badge de
+   * vencidas. Marcar uma tarefa como concluída custava a gravação MAIS três
+   * recarregamentos completos — e cada um deles paga o preâmbulo de
+   * autenticação e a viagem até o banco (medido: 154 ms por ida, VPS no Brasil,
+   * Supabase em ca-central-1). Dava ~1,7 s até o círculo mudar de estado.
+   *
+   * O conserto tem duas metades:
+   *
+   *  1. A resposta do servidor JÁ TRAZ a linha atualizada. Usá-la para corrigir
+   *     o cache é de graça; buscá-la de novo é pagar duas vezes pela mesma
+   *     informação.
+   *  2. O contador de pendentes muda de forma conhecida (±1), então ele é
+   *     ajustado aqui em vez de recontado lá.
+   *
+   * O badge de vencidas é o único que ainda volta ao servidor — e só quando a
+   * mudança PODE tê-lo afetado (conclusão ou prazo). Editar o texto de uma
+   * tarefa não mexe em vencimento nenhum e não gera chamada. Preferi recarregá-lo
+   * a calcular vencimento no cliente: a regra tem um dono só (`estaVencida`), e
+   * duplicá-la aqui criaria a segunda cópia que este código evita em toda parte.
+   */
+  const chave = ativa ? tarefasKey(ativa) : null;
+
+  /** Ajusta o contador de pendentes de uma lista sem ir ao servidor. */
+  function ajustarPendentes(listaId: string, delta: number) {
+    qc.setQueryData<ListaComPendentes[]>(LISTAS_KEY, (antes) =>
+      (antes ?? []).map((l) =>
+        l.id === listaId ? { ...l, pendentes: Math.max(0, l.pendentes + delta) } : l,
+      ),
+    );
+  }
+
+  /** Recarrega só o badge, e só quem chama decide se ele foi afetado. */
+  function recarregarBadge() {
     qc.invalidateQueries({ queryKey: RESUMO_KEY });
-    if (ativa) qc.invalidateQueries({ queryKey: tarefasKey(ativa) });
   }
 
   const criarLista = useMutation({
-    // Idem: o `onSuccess` abaixo LÊ esta resposta para abrir a lista recém-criada.
-    // As outras mutações não leem a delas, e por isso não precisam do desembrulho.
     mutationFn: async (nome: string) =>
       (await apiClient.post<{ data: ListaComPendentes }>("/api/v1/tarefas/listas", { nome })).data,
     onError: showApiError,
@@ -106,10 +138,11 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
     // lista aberta é DERIVADA do que está em cache, e sem semear o cache a
     // recém-criada não estaria lá — a derivação cairia na primeira lista e a
     // seleção só pularia para a certa quando a revalidação voltasse.
+    //
+    // Lista nova nasce vazia: nada a recarregar.
     onSuccess: (lista) => {
       qc.setQueryData<ListaComPendentes[]>(LISTAS_KEY, (antes) => [...(antes ?? []), lista]);
       setEscolhida(lista.id);
-      revalidar();
     },
   });
 
@@ -117,32 +150,109 @@ export function TarefasClient({ listasIniciais }: { listasIniciais: ListaComPend
     mutationFn: ({ id, nome }: { id: string; nome: string }) =>
       apiClient.patch(`/api/v1/tarefas/listas/${id}`, { nome }),
     onError: showApiError,
-    onSuccess: revalidar,
+    // Renomear não mexe em contagem nem em prazo: só o nome, e no cache.
+    onSuccess: (_r, { id, nome }) => {
+      qc.setQueryData<ListaComPendentes[]>(LISTAS_KEY, (antes) =>
+        (antes ?? []).map((l) => (l.id === id ? { ...l, nome } : l)),
+      );
+    },
   });
 
   const apagarLista = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/tarefas/listas/${id}`),
     onError: showApiError,
-    onSuccess: revalidar,
+    // Apagar leva as tarefas junto (cascade do banco), e entre elas pode haver
+    // vencidas — por isso o badge volta ao servidor aqui.
+    onSuccess: (_r, id) => {
+      qc.setQueryData<ListaComPendentes[]>(LISTAS_KEY, (antes) =>
+        (antes ?? []).filter((l) => l.id !== id),
+      );
+      qc.removeQueries({ queryKey: tarefasKey(id) });
+      recarregarBadge();
+    },
   });
 
   const criarTarefa = useMutation({
-    mutationFn: (texto: string) => apiClient.post("/api/v1/tarefas", { lista_id: ativa, texto }),
+    mutationFn: async (texto: string) =>
+      (await apiClient.post<{ data: Tarefa }>("/api/v1/tarefas", { lista_id: ativa, texto })).data,
     onError: showApiError,
-    onSuccess: revalidar,
+    // Tarefa nasce pendente e SEM prazo: soma um no contador e não toca no badge.
+    onSuccess: (tarefa) => {
+      if (chave) qc.setQueryData<Tarefa[]>(chave, (antes) => [...(antes ?? []), tarefa]);
+      ajustarPendentes(tarefa.lista_id, +1);
+    },
   });
 
   const alterarTarefa = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: TarefaPatch }) =>
-      apiClient.patch(`/api/v1/tarefas/${id}`, patch),
-    onError: showApiError,
-    onSuccess: revalidar,
+    mutationFn: async ({ id, patch }: { id: string; patch: TarefaPatch }) =>
+      (await apiClient.patch<{ data: Tarefa }>(`/api/v1/tarefas/${id}`, patch)).data,
+
+    /**
+     * ⚠️ A MUDANÇA APARECE ANTES DE O SERVIDOR CONFIRMAR — é isto que tira a
+     * sensação de travamento ao clicar no círculo.
+     *
+     * `cancelQueries` primeiro, e não é detalhe: uma busca em voo que voltasse
+     * depois desta linha traria o estado ANTIGO e desfaria o clique na tela,
+     * sozinha, sem erro nenhum.
+     *
+     * `concluida_em` acompanha `concluida` aqui pelo mesmo motivo que o banco
+     * tem um CHECK para isso: tarefa concluída sem carimbo é um estado que não
+     * existe, e deixá-lo aparecer por um instante na tela seria mentir barato.
+     */
+    onMutate: async ({ id, patch }) => {
+      if (!chave) return { anterior: undefined };
+      await qc.cancelQueries({ queryKey: chave });
+      const anterior = qc.getQueryData<Tarefa[]>(chave);
+      qc.setQueryData<Tarefa[]>(chave, (antes) =>
+        (antes ?? []).map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...patch,
+                ...(patch.concluida === undefined
+                  ? {}
+                  : { concluida_em: patch.concluida ? new Date().toISOString() : null }),
+              }
+            : t,
+        ),
+      );
+      if (patch.concluida !== undefined) {
+        const alvo = anterior?.find((t) => t.id === id);
+        if (alvo) ajustarPendentes(alvo.lista_id, patch.concluida ? -1 : +1);
+      }
+      return { anterior };
+    },
+
+    // Desfaz o otimismo e mostra o erro: a tela volta ao que o servidor tem.
+    onError: (erro, _v, ctx) => {
+      if (chave && ctx?.anterior) qc.setQueryData(chave, ctx.anterior);
+      qc.invalidateQueries({ queryKey: LISTAS_KEY });
+      showApiError(erro);
+    },
+
+    // A linha do servidor é a autoridade: substitui a versão otimista.
+    onSuccess: (tarefa, { patch }) => {
+      if (chave) {
+        qc.setQueryData<Tarefa[]>(chave, (antes) =>
+          (antes ?? []).map((t) => (t.id === tarefa.id ? tarefa : t)),
+        );
+      }
+      if (patch.concluida !== undefined || patch.vence_em !== undefined) recarregarBadge();
+    },
   });
 
   const apagarTarefa = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/v1/tarefas/${id}`),
     onError: showApiError,
-    onSuccess: revalidar,
+    onSuccess: (_r, id) => {
+      const alvo = chave ? qc.getQueryData<Tarefa[]>(chave)?.find((t) => t.id === id) : undefined;
+      if (chave) {
+        qc.setQueryData<Tarefa[]>(chave, (antes) => (antes ?? []).filter((t) => t.id !== id));
+      }
+      if (alvo && !alvo.concluida) ajustarPendentes(alvo.lista_id, -1);
+      // A apagada podia ser uma vencida — só então o badge muda.
+      if (alvo?.vence_em) recarregarBadge();
+    },
   });
 
   const listaAtiva = listas.find((l) => l.id === ativa) ?? null;
