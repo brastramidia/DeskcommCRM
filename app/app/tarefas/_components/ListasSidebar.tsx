@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DotsThree, PencilSimple, Plus, Trash } from "@/lib/ui/icons";
+import { DotsThree, List, PencilSimple, Plus, Trash } from "@/lib/ui/icons";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 import type { ListaComPendentes } from "@/lib/tarefas/consultas";
@@ -103,23 +103,35 @@ export function ListasSidebar({
             ) : (
               <div
                 className={cn(
-                  "flex items-center gap-1 rounded-md pl-3 pr-1 text-sm transition-colors",
+                  "flex items-center gap-1 rounded-md border-l-2 pl-2 pr-1 text-sm transition-colors",
                   // `muted` (= surface-elevated) e não uma tinta de accent: sobre
                   // Paper o accent a 50% vira um azul saturado que nenhuma outra
                   // lista do produto usa. É o padrão das telas que já vivem em
                   // superfície clara.
+                  //
+                  // A BORDA no accent é o que separa selecionado de "passando o
+                  // mouse": só o fundo não bastava, porque o hover usa o mesmo
+                  // token em outra opacidade e os dois estados se confundiam.
                   ativa === lista.id
-                    ? "bg-muted font-medium text-text"
-                    : "text-text-muted hover:bg-muted/40 hover:text-text",
+                    ? "border-l-accent bg-surface-elevated font-medium text-text"
+                    : "border-l-transparent text-text-muted hover:bg-muted/40 hover:text-text",
                 )}
               >
                 <button
                   type="button"
                   onClick={() => onSelecionar(lista.id)}
                   aria-current={ativa === lista.id ? "true" : undefined}
-                  className="min-w-0 flex-1 truncate py-1.5 text-left focus-visible:outline-none focus-visible:underline"
+                  className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left focus-visible:outline-none focus-visible:underline"
                 >
-                  {lista.nome}
+                  {/* O ícone dá âncora visual à coluna: sem ele, a lista de
+                      listas é uma pilha de palavras soltas, e nada distingue
+                      "isto é uma lista" de "isto é um rótulo". */}
+                  <List
+                    size={15}
+                    className={cn("shrink-0", ativa === lista.id ? "text-accent" : "text-text-subtle")}
+                    aria-hidden
+                  />
+                  <span className="truncate">{lista.nome}</span>
                 </button>
 
                 {/* O contador só aparece quando há o que fazer: um "0" fixo ao

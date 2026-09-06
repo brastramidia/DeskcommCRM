@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,6 +27,32 @@ import {
   type TarefaPatch,
 } from "@/lib/schemas/tarefas";
 import { formatarPrazo, montarPrazo, paraCampoDeData, paraCampoDeHora } from "@/lib/tarefas/datas";
+
+/**
+ * O SINAL DE PRIORIDADE QUE SOBREVIVE AO MOUSE.
+ *
+ * A bandeira mora no grupo de ações, que só aparece no hover — então, em
+ * repouso, uma tarefa marcada como urgente era indistinguível de uma comum. A
+ * borda esquerda resolve sem ocupar espaço: fica sempre visível, não empurra o
+ * texto e não compete com o checkbox.
+ *
+ * As três cores são tokens que o sistema já usa para severidade (info, warning,
+ * error). Nenhuma paleta nova — só o vocabulário existente aplicado a uma escala
+ * que já era de três níveis.
+ */
+const BORDA_DA_PRIORIDADE: Record<Prioridade, string> = {
+  0: "border-l-transparent",
+  1: "border-l-info",
+  2: "border-l-warning",
+  3: "border-l-error",
+};
+
+const COR_DO_SINAL: Record<Prioridade, string> = {
+  0: "",
+  1: "text-info",
+  2: "text-warning",
+  3: "text-error",
+};
 
 interface Props {
   tarefa: Tarefa;
@@ -64,7 +91,16 @@ export function TarefaLinha({ tarefa, onAlterar, onApagar }: Props) {
   }
 
   return (
-    <li className="group flex items-start gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
+    <li
+      className={cn(
+        "group flex items-start gap-3 rounded-md border-l-2 px-3 py-2.5 transition-colors",
+        "hover:bg-muted/60",
+        // Concluída perde o realce: o que já foi feito não disputa atenção.
+        tarefa.concluida
+          ? "border-l-transparent"
+          : BORDA_DA_PRIORIDADE[tarefa.prioridade as Prioridade],
+      )}
+    >
       {/* O círculo do Lembretes. Vazio quando pendente, preenchido quando feito. */}
       <button
         type="button"
@@ -110,7 +146,10 @@ export function TarefaLinha({ tarefa, onAlterar, onApagar }: Props) {
             className="block w-full text-left text-sm focus-visible:outline-none focus-visible:underline"
           >
             {sinal && (
-              <span className="mr-1 font-semibold text-error" aria-hidden>
+              <span
+                className={cn("mr-1 font-semibold", COR_DO_SINAL[tarefa.prioridade as Prioridade])}
+                aria-hidden
+              >
                 {sinal}
               </span>
             )}
@@ -128,15 +167,17 @@ export function TarefaLinha({ tarefa, onAlterar, onApagar }: Props) {
         )}
 
         {tarefa.vence_em && (
-          <span
-            className={cn(
-              "mt-0.5 block text-xs",
-              vencida ? "font-medium text-error" : "text-muted-foreground",
-            )}
+          // Badge e não texto solto: uma segunda linha de prosa competia com o
+          // título da tarefa e fazia as linhas com prazo parecerem de outro tipo.
+          // O chip agrupa ícone e data num objeto só, visivelmente secundário.
+          <Badge
+            variant={vencida ? "error" : "neutral"}
+            className="mt-1.5 px-2 py-0 text-[11px] font-normal"
           >
+            <CalendarBlank size={11} aria-hidden />
             {formatarPrazo(tarefa.vence_em, tarefa.vence_com_hora, locale, t)}
             {vencida && <span className="sr-only"> — {t("vencida")}</span>}
-          </span>
+          </Badge>
         )}
       </div>
 
