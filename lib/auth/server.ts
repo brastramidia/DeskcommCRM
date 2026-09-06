@@ -6,6 +6,8 @@
  * intentional here because we resolve the user from the validated JWT first
  * and then filter by `user_id` (a trusted source).
  */
+import { cache } from "react";
+
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { logger } from "@/lib/logger";
@@ -101,7 +103,26 @@ export function ehSessaoAusente(error: { name?: string } | null | undefined): bo
   return error?.name === "AuthSessionMissingError";
 }
 
-export async function loadAuthUser(): Promise<AuthUser | null> {
+/**
+ * O preâmbulo de autenticação, MEMOIZADO POR REQUISIÇÃO.
+ *
+ * `cache()` do React deduplica dentro de UMA requisição e não atravessa
+ * requisições — que é exatamente a garantia que um caminho de auth precisa:
+ * duas pessoas nunca compartilham resultado, e a segunda chamada da MESMA
+ * pessoa, no MESMO render, não repete o trabalho.
+ *
+ * Vale muito porque o preâmbulo roda mais de uma vez por página: `app/app/layout.tsx`
+ * chama `loadAuthUser()` para montar a casca e a página chama `requireAuth()` em
+ * seguida — duas execuções completas, ~920 ms em viagens de rede, para responder a
+ * mesma pergunta sobre a mesma pessoa.
+ *
+ * ⚠️ Só vale em contexto de requisição. Nenhum worker ou script usa este caminho
+ * (conferido), e se um passar a usar, `cache()` degrada para "sem memoização" em
+ * vez de vazar — não há estado global aqui.
+ */
+export const loadAuthUser = cache(carregarAuthUser);
+
+async function carregarAuthUser(): Promise<AuthUser | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -151,12 +172,37 @@ export async function loadAuthUser(): Promise<AuthUser | null> {
   // ⚠️ O erro é capturado de propósito: aqui `data: null` é AMBÍGUO — significa tanto
   // "não é platform admin" (RLS filtrou, estado normal) quanto "a query falhou".
   // Sem separar os dois, um banco instável rebaixa silenciosamente um super-admin.
-  const { data: paRow, error: paErro } = await supabase
-    .from("platform_admins")
-    .select("user_id, revoked_at")
-    .eq("user_id", user.id)
-    .is("revoked_at", null)
-    .maybeSingle();
+  /**
+   * ⚠️ AS DUAS EM PARALELO — elas nunca dependeram uma da outra.
+   *
+   * Ambas filtram por `user.id`, que já está em mãos. Em sequência, cada uma
+   * pagava a viagem inteira até o banco: medido nesta instalação, 154 ms por ida
+   * (a VPS está no Brasil e o Supabase em ca-central-1), então o preâmbulo de
+   * autenticação custava 3 viagens em fila — ~460 ms — antes de qualquer rota
+   * começar o próprio trabalho.
+   *
+   * `Promise.all` não muda o que é lido nem o tratamento de erro logo abaixo:
+   * os dois `error` continuam chegando separados, e a falha continua alta.
+   * O que muda é que as duas idas viram uma espera só.
+   */
+  const [
+    { data: paRow, error: paErro },
+    { data: rawMemberships, error: membErro },
+  ] = await Promise.all([
+    supabase
+      .from("platform_admins")
+      .select("user_id, revoked_at")
+      .eq("user_id", user.id)
+      .is("revoked_at", null)
+      .maybeSingle(),
+    supabase
+      .from("user_organizations")
+      .select("organization_id, role, accepted_at, organizations(display_name, locale)")
+      .eq("user_id", user.id)
+      .is("revoked_at", null)
+      .order("accepted_at", { ascending: true, nullsFirst: true })
+      .order("organization_id", { ascending: true }),
+  ]);
 
   // Org memberships (only active = not revoked, accepted)
   // ⚠️ `ORDER BY` NÃO É ENFEITE AQUI: esta lista decide QUAL ORGANIZAÇÃO FICA
@@ -173,13 +219,6 @@ export async function loadAuthUser(): Promise<AuthUser | null> {
   // reconhece como "a minha"; `organization_id` como desempate, para o resultado
   // ser determinístico mesmo quando as duas entraram no mesmo instante (é o caso
   // de quem foi convidado para várias no mesmo lote).
-  const { data: rawMemberships, error: membErro } = await supabase
-    .from("user_organizations")
-    .select("organization_id, role, accepted_at, organizations(display_name, locale)")
-    .eq("user_id", user.id)
-    .is("revoked_at", null)
-    .order("accepted_at", { ascending: true, nullsFirst: true })
-    .order("organization_id", { ascending: true });
 
   /**
    * FALHA ALTO, não baixo.
